@@ -125,31 +125,64 @@ header {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-.settings-popup {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
-  min-width: 250px;
+/* Settings modal: centered overlay + card (replaces the old anchored popover) */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: onb-fade 0.18s ease-out;
+}
+.settings-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   background: var(--pane-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: var(--shadow-lift);
-  padding: 12px 14px;
+  padding: 24px 22px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-  animation: rise-in 0.16s ease-out;
+  gap: 11px;
+  animation: rise-in 0.18s ease-out;
 }
-.settings-title {
+.settings-card-title { font-size: 18px; font-weight: 650; margin-bottom: 4px; }
+/* Section divider heading (e.g. "Conversation") */
+.settings-section {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
+  margin-top: 7px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
 }
+/* Collapsed "API keys" disclosure — tucked away since keys are set-once */
+.settings-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 7px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
+}
+.settings-keys > summary {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.settings-keys > summary:hover { color: var(--accent); }
+.settings-keys[open] > summary { margin-bottom: 2px; }
 .setting {
   font-size: 13px;
   color: var(--muted);

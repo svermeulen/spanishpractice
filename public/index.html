@@ -40,66 +40,76 @@
         <span id="costTicker" class="cost-ticker" title="Session cost so far">$0.00</span>
         <div class="settings-wrap">
           <button id="settingsBtn" class="icon-btn" title="Settings" aria-haspopup="true" aria-expanded="false">⚙</button>
-          <div id="settingsPopup" class="settings-popup hidden">
-            <h3 class="settings-title">Settings</h3>
-            <label class="setting setting-row">
-              <span>Model</span>
-              <select id="modelSelect"></select>
-            </label>
-            <label class="setting setting-row">
-              <span>Level</span>
-              <select id="levelSelect"></select>
-            </label>
-            <label class="setting setting-col" id="set-anthropic">
-              <span>Anthropic API key</span>
-              <input type="password" id="anthropicKey" class="setting-input" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
-            </label>
-            <label class="setting setting-col" id="set-openai">
-              <span>OpenAI API key</span>
-              <input type="password" id="openaiKey" class="setting-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
-            </label>
-            <label class="setting setting-col" id="set-gemini">
-              <span>Google Gemini API key</span>
-              <input type="password" id="geminiKey" class="setting-input" placeholder="AIza..." autocomplete="off" spellcheck="false" />
-            </label>
-            <label class="setting setting-col">
-              <span>ElevenLabs API key <span class="setting-hint">(optional — enables 🔊)</span></span>
-              <input type="password" id="elevenLabsKey" class="setting-input" placeholder="ElevenLabs key..." autocomplete="off" spellcheck="false" />
-            </label>
-            <details class="setting-details" id="set-compatible">
-              <summary>Custom OpenAI-compatible endpoint</summary>
-              <label class="setting setting-col">
-                <span>Base URL</span>
-                <input type="text" id="compatBaseUrl" class="setting-input" placeholder="https://openrouter.ai/api/v1" autocomplete="off" spellcheck="false" />
+          <div id="settingsPopup" class="settings-overlay hidden">
+            <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+              <button id="settingsClose" class="onb-close" type="button" title="Close" aria-label="Close">×</button>
+              <h2 id="settingsTitle" class="settings-card-title">Settings</h2>
+
+              <label class="setting setting-row">
+                <span>Model</span>
+                <select id="modelSelect"></select>
               </label>
-              <label class="setting setting-col">
-                <span>API key <span class="setting-hint">(if required)</span></span>
-                <input type="password" id="compatKey" class="setting-input" placeholder="endpoint key..." autocomplete="off" spellcheck="false" />
+              <label class="setting setting-row">
+                <span>Level</span>
+                <select id="levelSelect"></select>
               </label>
-              <label class="setting setting-col">
-                <span>Model id</span>
-                <input type="text" id="compatModel" class="setting-input" placeholder="e.g. openai/gpt-4o-mini" autocomplete="off" spellcheck="false" />
+
+              <h3 class="settings-section">Conversation</h3>
+              <label class="setting setting-row">
+                <span><input type="checkbox" id="autoShowEn" /> Auto-show translations</span>
+                <kbd class="setting-key">⌘E</kbd>
               </label>
-              <p class="settings-note">Choose “Custom (OpenAI-compatible)” in the model list to use this. Works with OpenRouter, Groq, Together, etc. Local servers (Ollama / LM Studio) only work when this page is opened over <code>http://</code> — a hosted <code>https</code> page can't call <code>http://localhost</code> (mixed content). Cost isn't tracked for custom endpoints.</p>
-            </details>
-            <p class="settings-note">Keys are stored only in this browser and sent directly to each provider — never to any server. Tip: use keys with a spending limit.</p>
-            <label class="setting setting-row">
-              <span><input type="checkbox" id="autoShowEn" /> Auto-show translations</span>
-              <kbd class="setting-key">⌘E</kbd>
-            </label>
-            <label class="setting setting-row">
-              <span><input type="checkbox" id="autoShowNotes" /> Auto-show notes</span>
-              <kbd class="setting-key">⌘I</kbd>
-            </label>
-            <label class="setting setting-row">
-              <span><input type="checkbox" id="checkAccents" /> Correct accents &amp; punctuation</span>
-            </label>
-            <label class="setting setting-row">
-              <span><input type="checkbox" id="showCost" /> Show session cost</span>
-            </label>
-            <label class="setting setting-row tts-only">
-              <span><input type="checkbox" id="autoPlayAudio" /> Auto-play replies 🔊</span>
-            </label>
+              <label class="setting setting-row">
+                <span><input type="checkbox" id="autoShowNotes" /> Auto-show notes</span>
+                <kbd class="setting-key">⌘I</kbd>
+              </label>
+              <label class="setting setting-row">
+                <span><input type="checkbox" id="checkAccents" /> Correct accents &amp; punctuation</span>
+              </label>
+              <label class="setting setting-row tts-only">
+                <span><input type="checkbox" id="autoPlayAudio" /> Auto-play replies 🔊</span>
+              </label>
+              <label class="setting setting-row">
+                <span><input type="checkbox" id="showCost" /> Show session cost</span>
+              </label>
+
+              <details class="settings-keys" id="set-keys">
+                <summary>API keys &amp; custom endpoint</summary>
+                <label class="setting setting-col" id="set-anthropic">
+                  <span>Anthropic API key</span>
+                  <input type="password" id="anthropicKey" class="setting-input" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="setting setting-col" id="set-openai">
+                  <span>OpenAI API key</span>
+                  <input type="password" id="openaiKey" class="setting-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="setting setting-col" id="set-gemini">
+                  <span>Google Gemini API key</span>
+                  <input type="password" id="geminiKey" class="setting-input" placeholder="AIza..." autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="setting setting-col">
+                  <span>ElevenLabs API key <span class="setting-hint">(optional — enables 🔊)</span></span>
+                  <input type="password" id="elevenLabsKey" class="setting-input" placeholder="ElevenLabs key..." autocomplete="off" spellcheck="false" />
+                </label>
+                <details class="setting-details" id="set-compatible">
+                  <summary>Custom OpenAI-compatible endpoint</summary>
+                  <label class="setting setting-col">
+                    <span>Base URL</span>
+                    <input type="text" id="compatBaseUrl" class="setting-input" placeholder="https://openrouter.ai/api/v1" autocomplete="off" spellcheck="false" />
+                  </label>
+                  <label class="setting setting-col">
+                    <span>API key <span class="setting-hint">(if required)</span></span>
+                    <input type="password" id="compatKey" class="setting-input" placeholder="endpoint key..." autocomplete="off" spellcheck="false" />
+                  </label>
+                  <label class="setting setting-col">
+                    <span>Model id</span>
+                    <input type="text" id="compatModel" class="setting-input" placeholder="e.g. openai/gpt-4o-mini" autocomplete="off" spellcheck="false" />
+                  </label>
+                  <p class="settings-note">Choose “Custom (OpenAI-compatible)” in the model list to use this. Works with OpenRouter, Groq, Together, etc. Local servers (Ollama / LM Studio) only work when this page is opened over <code>http://</code> — a hosted <code>https</code> page can't call <code>http://localhost</code> (mixed content). Cost isn't tracked for custom endpoints.</p>
+                </details>
+                <p class="settings-note">Keys are stored only in this browser and sent directly to each provider — never to any server. Tip: use keys with a spending limit.</p>
+              </details>
+            </div>
           </div>
         </div>
       </div>

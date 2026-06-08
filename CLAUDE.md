@@ -40,11 +40,16 @@ Defined in the `KEYMAP` object in `public/app.js`; rebindable without code chang
 - `Tab` — jump between the two text inputs
 - `↑`/`↓` — shell-style recall of previously sent messages in either input (draft is preserved)
 - `⌘K` — restart with a new random situation (same as the 🎲 button)
-- `⌘E` — toggle auto-show translations (teacher EN + "Understood as"), `⌘I` — toggle auto-show notes; both flip the persisted settings (also exposed in the ⚙ settings popover)
+- `⌘E` — toggle auto-show translations (teacher EN + "Understood as"), `⌘I` — toggle auto-show notes; both flip the persisted settings (also exposed in the ⚙ settings modal)
 
-## Settings popover
+## Settings modal
 
-The ⚙ button in the header opens a popover with all per-user settings (persisted in localStorage, applied immediately): the model select (grouped by provider, built from `getModelOptions()`), the difficulty **level** select (`level`, CEFR A1–B2 from `getLevelOptions()`, default `A1`, applied to subsequent turns), per-provider API keys (Anthropic / OpenAI / Gemini, plus the optional ElevenLabs key that gates the 🔊 buttons), a collapsible "Custom OpenAI-compatible endpoint" section (base URL / key / model id), auto-show translations (`autoShowEn`), auto-show notes (`autoShowNotes`), correct accents & punctuation (`checkAccents`, default off / lenient — see the diff notes above), show session cost (`showCost`, default on), and auto-play replies (`autoPlayAudio`, default on — a `.tts-only` row hidden when no audio backend is available). Only the key/endpoint block for the selected model's provider is shown — `applyProviderVisibility()` toggles the `#set-anthropic` / `#set-openai` / `#set-gemini` / `#set-compatible` blocks on load and on every model change (the model select and ElevenLabs key always stay visible; the custom-endpoint disclosure auto-opens when its provider is active). Only the key for the selected model's provider is needed to chat; supplying it (or switching to a model whose provider is already configured) auto-resumes the opening. `Esc` or an outside click closes it.
+The ⚙ button in the header opens a centered **modal** (`#settingsPopup` = `.settings-overlay` backdrop → `.settings-card`; the same overlay/card pattern as onboarding) with all per-user settings (persisted in localStorage, applied immediately), organized for readability:
+- **Top:** the model select (grouped by provider, built from `getModelOptions()`) and the difficulty **level** select (`level`, CEFR A1–B2 from `getLevelOptions()`, default `A1`, applied to subsequent turns).
+- **"Conversation" section:** auto-show translations (`autoShowEn`), auto-show notes (`autoShowNotes`), correct accents & punctuation (`checkAccents`, default off / lenient — see the diff notes above), auto-play replies (`autoPlayAudio`, default on — a `.tts-only` row hidden when no audio backend is available), show session cost (`showCost`, default on).
+- **Collapsed "API keys & custom endpoint" disclosure** (`#set-keys`, a `<details>`): per-provider keys (Anthropic / OpenAI / Gemini), the optional ElevenLabs key that gates the 🔊 buttons, and the nested "Custom OpenAI-compatible endpoint" disclosure (base URL / key / model id). Tucked away because keys are set-once; `applyProviderVisibility()` shows only the selected provider's key block (`#set-anthropic` / `#set-openai` / `#set-gemini` / `#set-compatible`) on load and on every model change, and **auto-opens `#set-keys`** when the chosen model's provider isn't keyed yet so the field is findable.
+
+Only the key for the selected model's provider is needed to chat; supplying it (or switching to a model whose provider is already configured) auto-resumes the opening. Closed by the × button, an `Esc` press, or a click on the backdrop (outside the card).
 
 ## Roadmap (discussed, not yet built)
 

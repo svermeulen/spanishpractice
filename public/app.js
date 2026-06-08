@@ -863,6 +863,9 @@ function applyProviderVisibility() {
     // Expand the custom-endpoint disclosure when it's the active provider.
     if (id === "set-compatible") $(id).open = show;
   }
+  // Keys live in a collapsed disclosure (they're set-once) — but pop it open
+  // automatically when the chosen model can't run yet, so the field is findable.
+  if (model && !hasKeyForModel(model)) $("set-keys").open = true;
 }
 applyProviderVisibility();
 
@@ -942,7 +945,7 @@ checkAccentsEl.addEventListener("change", () => {
   localStorage.setItem("checkAccents", String(checkAccents));
 });
 
-// ---- Settings popover ----
+// ---- Settings modal ----
 const settingsBtn = $("settingsBtn");
 const settingsPopup = $("settingsPopup");
 function toggleSettings(show) {
@@ -950,13 +953,12 @@ function toggleSettings(show) {
   settingsPopup.classList.toggle("hidden", !willShow);
   settingsBtn.setAttribute("aria-expanded", String(willShow));
 }
-settingsBtn.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleSettings();
+settingsBtn.addEventListener("click", () => toggleSettings());
+$("settingsClose").addEventListener("click", () => toggleSettings(false));
+// Clicking the backdrop (outside the card) closes; clicks on the card don't.
+settingsPopup.addEventListener("click", (e) => {
+  if (e.target === settingsPopup) toggleSettings(false);
 });
-// Clicks inside the popup shouldn't close it; clicks anywhere else should.
-settingsPopup.addEventListener("click", (e) => e.stopPropagation());
-document.addEventListener("click", () => toggleSettings(false));
 
 // ---- Voice input (Web Speech API) ----
 // Progressive enhancement: where the browser exposes SpeechRecognition, the 🎤
