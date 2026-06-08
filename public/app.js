@@ -398,6 +398,7 @@ async function generateOpening() {
   // is set up. Guards against double-firing (boot + onboarding + key changes).
   if (!situation || opening || openingInFlight || !hasKeyForModel(model)) return;
   openingInFlight = true;
+  const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   const input = $("chatInput");
   const button = $("chatForm").querySelector("button");
   input.disabled = true;
@@ -406,20 +407,26 @@ async function generateOpening() {
   scrollToBottom(chatMessagesEl);
   try {
     const turn = await apiOpening({ situation, model });
+    if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
     trackUsage(turn.usage);
     opening = { reply_es: turn.reply_es, reply_en: turn.reply_en };
     addTeacherMessage(opening);
     seedOpeningHistory();
   } catch (err) {
+    if (mySession !== sessionId) return;
     thinking.remove();
     addError(chatMessagesEl, err.message, generateOpening);
   } finally {
-    openingInFlight = false;
-    input.disabled = false;
-    button.disabled = false;
-    input.focus();
-    scrollToBottom(chatMessagesEl);
+    // Only the current session owns the shared UI/lock state; a superseded call
+    // must leave the new session's input state and openingInFlight untouched.
+    if (mySession === sessionId) {
+      openingInFlight = false;
+      input.disabled = false;
+      button.disabled = false;
+      input.focus();
+      scrollToBottom(chatMessagesEl);
+    }
   }
 }
 
@@ -429,6 +436,7 @@ async function sendChatMessage(text, existingMsg = null) {
   input.disabled = true;
   button.disabled = true;
 
+  const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   const msg = existingMsg ?? addUserChatMessage(text);
   const thinking = addThinking(chatMessagesEl);
   scrollToBottom(chatMessagesEl);
@@ -440,6 +448,7 @@ async function sendChatMessage(text, existingMsg = null) {
       message: text,
       model,
     });
+    if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
     trackUsage(turn.usage);
     addCorrectionBlock(msg, text, turn);
@@ -451,13 +460,16 @@ async function sendChatMessage(text, existingMsg = null) {
     transcript.push(`Teacher: ${turn.reply_es}`);
     turns.push({ message: text, turn });
   } catch (err) {
+    if (mySession !== sessionId) return;
     thinking.remove();
     addError(chatMessagesEl, err.message, () => sendChatMessage(text, msg));
   } finally {
-    input.disabled = false;
-    button.disabled = false;
-    input.focus();
-    scrollToBottom(chatMessagesEl);
+    if (mySession === sessionId) {
+      input.disabled = false;
+      button.disabled = false;
+      input.focus();
+      scrollToBottom(chatMessagesEl);
+    }
   }
 }
 
@@ -467,6 +479,7 @@ async function sendTutorQuestion(text, existingMsg = null) {
   input.disabled = true;
   button.disabled = true;
 
+  const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   let msg = existingMsg;
   if (!msg) {
     msg = addEl(tutorMessagesEl, "div", "msg user");
@@ -482,6 +495,7 @@ async function sendTutorQuestion(text, existingMsg = null) {
       transcript: transcript.join("\n"),
       model,
     });
+    if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
     trackUsage(usage);
     const reply = addEl(tutorMessagesEl, "div", "msg teacher");
@@ -490,13 +504,16 @@ async function sendTutorQuestion(text, existingMsg = null) {
     tutorHistory.push({ role: "assistant", content: answer });
     tutorTurns.push({ question: text, answer });
   } catch (err) {
+    if (mySession !== sessionId) return;
     thinking.remove();
     addError(tutorMessagesEl, err.message, () => sendTutorQuestion(text, msg));
   } finally {
-    input.disabled = false;
-    button.disabled = false;
-    input.focus();
-    scrollToBottom(tutorMessagesEl);
+    if (mySession === sessionId) {
+      input.disabled = false;
+      button.disabled = false;
+      input.focus();
+      scrollToBottom(tutorMessagesEl);
+    }
   }
 }
 
@@ -588,8 +605,10 @@ async function startRandomSession() {
   const thinking = addThinking(chatMessagesEl);
   scrollToBottom(chatMessagesEl);
   scenarioInFlight = true;
+  const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   try {
     const sc = await apiScenario({ model });
+    if (mySession !== sessionId) return; // session reset while we awaited — discard
     trackUsage(sc.usage);
     thinking.remove();
     situation = sc.ai;
@@ -598,6 +617,7 @@ async function startRandomSession() {
     renderSituationLabel();
     generateOpening(); // manages input enabled-state from here
   } catch (err) {
+    if (mySession !== sessionId) return;
     thinking.remove();
     situationDisplay = "Couldn't generate a situation";
     renderSituationLabel();
@@ -605,6 +625,8 @@ async function startRandomSession() {
     button.disabled = false;
     addError(chatMessagesEl, err.message, startRandomSession);
   } finally {
+    // scenarioInFlight is a re-entry lock for this function (only one runs at a
+    // time), so always release it — even when superseded.
     scenarioInFlight = false;
   }
 }

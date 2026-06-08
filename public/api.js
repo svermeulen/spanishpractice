@@ -251,6 +251,18 @@ async function complete({ model, system, messages, schema, maxTokens }) {
   return { text: out.text, usage: usagePayload(r.modelId, r.pricing, out.usage) };
 }
 
+// Parse a structured-output response. An empty/invalid body usually means the
+// model spent its whole token budget on thinking (common on Gemini 2.5 / GPT-5
+// reasoning models) or the endpoint ignored the schema — surface that instead of
+// a raw "Unexpected end of JSON input".
+function parseStructured(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("The model didn't return a usable response (it may have run out of output budget). Please try again.");
+  }
+}
+
 async function apiChat({ situation, history = [], message, model }) {
   const { text, usage } = await complete({
     model,
@@ -259,13 +271,16 @@ async function apiChat({ situation, history = [], message, model }) {
     schema: TURN_SCHEMA,
     maxTokens: 16000,
   });
-  const turn = JSON.parse(text);
+  const turn = parseStructured(text);
   // The model occasionally emits stray backslash artifacts in notes
   // (e.g. "\\an'" or "\\\\" where an em-dash belongs). Backslashes are never
   // legitimate in notes text, so drop those tokens.
   if (turn.notes) {
     turn.notes = turn.notes.replace(/\\+\S*/g, "").replace(/ {2,}/g, " ").trim();
   }
+  // Custom OpenAI-compatible endpoints run non-strict, so a backend may omit
+  // fields. Backfill the ones the UI dereferences so rendering can't throw.
+  if (!Array.isArray(turn.mistake_tags)) turn.mistake_tags = [];
   return { ...turn, usage };
 }
 
@@ -277,7 +292,7 @@ async function apiOpening({ situation, model }) {
     schema: OPENING_SCHEMA,
     maxTokens: 4000,
   });
-  return { ...JSON.parse(text), usage };
+  return { ...parseStructured(text), usage };
 }
 
 async function apiTutor({ history = [], question, transcript = "", model }) {
@@ -352,7 +367,7 @@ async function apiScenario({ model }) {
     schema: SCENARIO_SCHEMA,
     maxTokens: 2000,
   });
-  return { ...JSON.parse(text), usage };
+  return { ...parseStructured(text), usage };
 }
 
 // ---- Provider adapters ----
