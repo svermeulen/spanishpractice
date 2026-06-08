@@ -92,6 +92,23 @@
     </div>
   </div>
 
+  <!-- First-run onboarding -->
+  <div id="onboarding" class="onb-overlay hidden">
+    <div class="onb-card" role="dialog" aria-modal="true" aria-labelledby="onbTitle">
+      <button id="onbClose" class="onb-close" type="button" title="Close" aria-label="Close">×</button>
+      <h1 id="onbTitle" class="onb-title">¡Hola! Welcome to Spanish Converser 🇪🇸</h1>
+      <p class="onb-lead">Practice Spanish through AI roleplay — chat in Spanish, get gentle corrections, and ask a built-in tutor anything.</p>
+      <p class="onb-note">It's free and runs entirely in your browser — there's no server. You bring your own AI API key: it's stored only on this device and sent straight to the provider you pick. Nothing is logged or proxied.</p>
+      <label class="onb-field">
+        <span>AI provider</span>
+        <select id="onbProvider"></select>
+      </label>
+      <div id="onbFields"></div>
+      <button id="onbStart" class="onb-start" type="button" disabled>Start practicing</button>
+      <p class="onb-fine">Tip: create a key with a spending limit. You can change provider, model, or keys anytime in ⚙ Settings.</p>
+    </div>
+  </div>
+
   <script src="api.js"></script>
   <script src="app.js"></script>
 </body>

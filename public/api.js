@@ -94,6 +94,17 @@ function resolveModel(selected) {
   return { providerId: "anthropic", provider: p, modelId: DEFAULT_MODEL, pricing: { in: m.in, out: m.out } };
 }
 
+function providerKeyName(pid) {
+  return PROVIDERS[pid]?.keyName;
+}
+
+// The cheap default model to start a provider on (first in its catalog, which
+// is ordered cheapest-first). The custom endpoint has no catalog → its sentinel.
+function firstModelForProvider(pid) {
+  if (pid === "compatible") return CUSTOM_MODEL_VALUE;
+  return PROVIDERS[pid]?.models[0]?.id || "";
+}
+
 // Grouped options for building the model <select> (one <optgroup> per provider).
 function getModelOptions() {
   return Object.entries(PROVIDERS).map(([pid, p]) => ({

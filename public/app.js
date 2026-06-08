@@ -12,7 +12,7 @@ let sessionId = null; // per-conversation id — only used to pick a consistent 
 let turns = []; // [{message, turn}] — in-memory conversation state (not persisted)
 let tutorTurns = []; // [{question, answer}]
 let opening = null; // {reply_es, reply_en} — the AI's in-character first message
-let openingFailed = false; // true when the opening couldn't run (e.g. no API key yet)
+let openingInFlight = false; // true while the opening request is running
 let chatHistory = []; // [{role, content}] — assistant entries are reply_es only
 let tutorHistory = [];
 let transcript = []; // ["Learner: ...", "Teacher: ..."] for tutor context
@@ -340,6 +340,10 @@ function seedOpeningHistory() {
 }
 
 async function generateOpening() {
+  // One opening per session, only once a usable model+key exists and a session
+  // is set up. Guards against double-firing (boot + onboarding + key changes).
+  if (!situation || opening || openingInFlight || !hasKeyForModel(model)) return;
+  openingInFlight = true;
   const input = $("chatInput");
   const button = $("chatForm").querySelector("button");
   input.disabled = true;
@@ -349,18 +353,15 @@ async function generateOpening() {
   try {
     const turn = await apiOpening({ situation, model });
     thinking.remove();
-    openingFailed = false;
     trackUsage(turn.usage);
     opening = { reply_es: turn.reply_es, reply_en: turn.reply_en };
     addTeacherMessage(opening);
     seedOpeningHistory();
   } catch (err) {
     thinking.remove();
-    // No key yet → the opening never ran; remember so pasting a key in
-    // Settings can resume it automatically (see bindKeyInput below).
-    openingFailed = true;
     addError(chatMessagesEl, err.message, generateOpening);
   } finally {
+    openingInFlight = false;
     input.disabled = false;
     button.disabled = false;
     input.focus();
@@ -477,6 +478,7 @@ function startSession(scenario) {
   turns = [];
   tutorTurns = [];
   opening = null;
+  openingInFlight = false;
   chatHistory = [];
   tutorHistory = [];
   transcript = [];
@@ -486,8 +488,9 @@ function startSession(scenario) {
   tutorMessagesEl.innerHTML = "";
   addTutorIntro();
   showMain();
-  // Have the AI open the conversation in character (skipped in demo mode,
-  // which renders a canned conversation without calling the API).
+  // Have the AI open the conversation in character (skipped in demo mode, and
+  // a no-op until a model+key is configured — generateOpening guards on that,
+  // so the onboarding modal / key entry resumes it).
   if (!isDemo) generateOpening();
 }
 
@@ -628,21 +631,30 @@ function bindKeyInput(id, storageKey, onChange) {
     if (onChange) onChange();
   });
 }
-// Once the selected model's provider is configured and the opening never got
-// to run, kick it off — so supplying a key/endpoint makes the conversation
-// appear without a manual retry. Also runs when switching to a model whose
-// provider you've already configured.
+// Supplying a key/endpoint (or switching to an already-configured provider)
+// kicks off the opening if it hasn't run yet — generateOpening self-guards on
+// model/key/session state, so this is safe to call freely.
 function maybeResumeOpening() {
-  if (openingFailed && !opening && hasKeyForModel(model)) generateOpening();
+  generateOpening();
 }
 
-bindKeyInput("anthropicKey", "anthropicApiKey", maybeResumeOpening);
-bindKeyInput("openaiKey", "openaiApiKey", maybeResumeOpening);
-bindKeyInput("geminiKey", "geminiApiKey", maybeResumeOpening);
-bindKeyInput("compatBaseUrl", "compatibleBaseUrl", maybeResumeOpening);
-bindKeyInput("compatKey", "compatibleApiKey", maybeResumeOpening);
-bindKeyInput("compatModel", "compatibleModel", maybeResumeOpening);
-bindKeyInput("elevenLabsKey", "elevenLabsApiKey", applyTtsVisibility);
+// Settings input id ↔ localStorage key. Used for binding and for reflecting
+// onboarding's writes back into the popover.
+const KEY_INPUTS = [
+  ["anthropicKey", "anthropicApiKey"],
+  ["openaiKey", "openaiApiKey"],
+  ["geminiKey", "geminiApiKey"],
+  ["compatBaseUrl", "compatibleBaseUrl"],
+  ["compatKey", "compatibleApiKey"],
+  ["compatModel", "compatibleModel"],
+  ["elevenLabsKey", "elevenLabsApiKey"],
+];
+for (const [id, k] of KEY_INPUTS) {
+  bindKeyInput(id, k, k === "elevenLabsApiKey" ? applyTtsVisibility : maybeResumeOpening);
+}
+function syncSettingsInputs() {
+  for (const [id, k] of KEY_INPUTS) $(id).value = localStorage.getItem(k) || "";
+}
 
 // Build the model dropdown grouped by provider (options come from api.js).
 // There is no default model: a disabled "Choose a model…" placeholder is the
@@ -690,16 +702,6 @@ function applyProviderVisibility() {
     // Expand the custom-endpoint disclosure when it's the active provider.
     if (id === "set-compatible") $(id).open = show;
   }
-}
-// Focus what the user needs next: the model picker if nothing's chosen,
-// otherwise the visible key field of the selected model's provider.
-function focusActiveProviderKey() {
-  if (!model) {
-    modelSelectEl.focus();
-    return;
-  }
-  const block = $(PROVIDER_SETTING_IDS[resolveModel(model).providerId]);
-  block?.querySelector("input")?.focus();
 }
 applyProviderVisibility();
 
@@ -821,17 +823,140 @@ $("tutorForm").addEventListener("submit", (e) => {
   sendTutorQuestion(text);
 });
 
+// ---- Onboarding modal ----
+// First run shows a welcome modal explaining the app + the bring-your-own-key
+// model, collects a provider + key, picks that provider's cheapest model, and
+// starts the conversation. Returning users (model+key already configured) skip
+// it entirely.
+const ONB_PROVIDERS = [
+  { id: "anthropic", label: "Anthropic — Claude", short: "Anthropic", placeholder: "sk-ant-...", keyUrl: "https://console.anthropic.com/settings/keys" },
+  { id: "openai", label: "OpenAI — GPT", short: "OpenAI", placeholder: "sk-...", keyUrl: "https://platform.openai.com/api-keys" },
+  { id: "gemini", label: "Google — Gemini", short: "Gemini", placeholder: "AIza...", keyUrl: "https://aistudio.google.com/apikey" },
+  { id: "compatible", label: "Custom (OpenAI-compatible)", short: "", placeholder: "", keyUrl: "" },
+];
+
+const onbOverlay = $("onboarding");
+const onbProviderEl = $("onbProvider");
+const onbFieldsEl = $("onbFields");
+const onbStartEl = $("onbStart");
+
+for (const p of ONB_PROVIDERS) {
+  const o = document.createElement("option");
+  o.value = p.id;
+  o.textContent = p.label;
+  onbProviderEl.appendChild(o);
+}
+
+function setStored(k, v) {
+  const t = (v || "").trim();
+  if (t) localStorage.setItem(k, t);
+  else localStorage.removeItem(k);
+}
+
+function validateOnb() {
+  const pid = onbProviderEl.value;
+  const ok =
+    pid === "compatible"
+      ? $("onbBaseUrl").value.trim() && $("onbModel").value.trim()
+      : $("onbKey").value.trim();
+  onbStartEl.disabled = !ok;
+}
+
+// Render the provider-specific field(s) into the modal, prefilling anything the
+// user already has stored.
+function renderOnbFields(pid) {
+  onbFieldsEl.innerHTML = "";
+  const addField = (labelHtml, id, type, placeholder, value) => {
+    const f = document.createElement("label");
+    f.className = "onb-field";
+    const s = document.createElement("span");
+    s.innerHTML = labelHtml;
+    const i = document.createElement("input");
+    i.id = id;
+    i.className = "onb-input";
+    i.type = type;
+    i.placeholder = placeholder;
+    i.autocomplete = "off";
+    i.spellcheck = false;
+    i.value = value || "";
+    f.append(s, i);
+    onbFieldsEl.appendChild(f);
+    return i;
+  };
+  const addHint = (html) => {
+    const p = document.createElement("p");
+    p.className = "onb-hint";
+    p.innerHTML = html;
+    onbFieldsEl.appendChild(p);
+  };
+
+  if (pid === "compatible") {
+    addField("Base URL", "onbBaseUrl", "text", "https://openrouter.ai/api/v1", localStorage.getItem("compatibleBaseUrl"));
+    addField("Model id", "onbModel", "text", "e.g. openai/gpt-4o-mini", localStorage.getItem("compatibleModel"));
+    addField('API key <span class="onb-opt">(if required)</span>', "onbKey", "password", "endpoint key...", localStorage.getItem("compatibleApiKey"));
+    addHint("Works with OpenRouter, Groq, Together, etc. Local servers (Ollama / LM Studio) need this page opened over <code>http://</code>.");
+  } else {
+    const prov = ONB_PROVIDERS.find((p) => p.id === pid);
+    addField("API key", "onbKey", "password", prov.placeholder, localStorage.getItem(providerKeyName(pid)));
+    addHint(`<a href="${prov.keyUrl}" target="_blank" rel="noopener">Get a ${prov.short} key ↗</a>`);
+  }
+
+  for (const i of onbFieldsEl.querySelectorAll("input")) {
+    i.addEventListener("input", validateOnb);
+    i.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !onbStartEl.disabled) startFromOnboarding();
+    });
+  }
+  validateOnb();
+  onbFieldsEl.querySelector("input")?.focus();
+}
+
+onbProviderEl.addEventListener("change", () => renderOnbFields(onbProviderEl.value));
+
+function showOnboarding() {
+  const pid = model && resolveModel(model).providerId;
+  onbProviderEl.value = ONB_PROVIDERS.some((p) => p.id === pid) ? pid : "anthropic";
+  renderOnbFields(onbProviderEl.value);
+  onbOverlay.classList.remove("hidden");
+}
+
+function hideOnboarding() {
+  onbOverlay.classList.add("hidden");
+}
+
+function startFromOnboarding() {
+  const pid = onbProviderEl.value;
+  if (pid === "compatible") {
+    setStored("compatibleBaseUrl", $("onbBaseUrl").value);
+    setStored("compatibleModel", $("onbModel").value);
+    setStored("compatibleApiKey", $("onbKey").value);
+  } else {
+    setStored(providerKeyName(pid), $("onbKey").value);
+  }
+  model = firstModelForProvider(pid);
+  localStorage.setItem("model", model);
+  modelSelectEl.value = model;
+  syncSettingsInputs();
+  applyProviderVisibility();
+  applyTtsVisibility();
+  hideOnboarding();
+  generateOpening();
+}
+
+onbStartEl.addEventListener("click", startFromOnboarding);
+// Escape hatch: closing the modal drops the user into Settings instead.
+$("onbClose").addEventListener("click", () => {
+  hideOnboarding();
+  toggleSettings(true);
+});
+
 // ---- Boot ----
 // No start screen: jump straight into a conversation with a random scenario.
-// First-run with no key for the selected model's provider: open Settings so
-// the user knows what to do (the scenario still loads; the opening shows an
-// inline "add your key" message that resolves the moment a key is supplied).
+// First run (no usable model+key) shows the onboarding modal; the scenario
+// loads behind it and the opening fires once onboarding completes.
 if (!isDemo) {
   startRandomSession();
-  if (!hasKeyForModel(model)) {
-    toggleSettings(true);
-    focusActiveProviderKey();
-  }
+  if (!hasKeyForModel(model)) showOnboarding();
 }
 
 // Dev helper: ?demo renders a sample conversation without calling the API,

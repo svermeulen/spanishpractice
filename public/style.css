@@ -486,3 +486,92 @@ ins {
   50% { opacity: 0.15; }
 }
 body.no-tts .speak-btn { display: none; }
+
+/* ---- Onboarding modal ---- */
+.onb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: onb-fade 0.18s ease-out;
+}
+@keyframes onb-fade { from { opacity: 0; } to { opacity: 1; } }
+.onb-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  background: var(--pane-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lift);
+  padding: 28px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: rise-in 0.18s ease-out;
+}
+.onb-close {
+  position: absolute;
+  top: 10px;
+  right: 13px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+}
+.onb-close:hover { color: var(--accent); }
+.onb-title { font-size: 20px; font-weight: 650; line-height: 1.25; }
+.onb-lead { font-size: 14px; line-height: 1.5; color: var(--text); }
+.onb-note { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.onb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.onb-input,
+#onbProvider {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--pane-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.onb-input:focus,
+#onbProvider:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+#onbFields { display: flex; flex-direction: column; gap: 14px; }
+.onb-hint { font-size: 12px; color: var(--muted); margin-top: -3px; }
+.onb-hint a { color: var(--accent); text-decoration: none; }
+.onb-hint a:hover { text-decoration: underline; }
+.onb-opt { opacity: 0.7; }
+.onb-start {
+  margin-top: 4px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.onb-start:hover:not(:disabled) { background: var(--accent-hover); }
+.onb-start:disabled { opacity: 0.45; cursor: default; }
+.onb-fine { font-size: 11.5px; line-height: 1.45; color: var(--muted); }
