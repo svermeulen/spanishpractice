@@ -3,7 +3,7 @@ const isDemo = new URLSearchParams(location.search).has("demo");
 let autoShowEn = localStorage.getItem("autoShowEn") === "true";
 let autoShowNotes = localStorage.getItem("autoShowNotes") === "true";
 let showCost = localStorage.getItem("showCost") !== "false"; // shown by default
-let model = localStorage.getItem("model") || "claude-haiku-4-5";
+let model = localStorage.getItem("model") || ""; // "" = no model chosen yet
 let sessionCost = 0;
 let sessionTokens = { in: 0, out: 0 };
 let situation = ""; // AI-facing role/persona — sent to the prompt, hidden from the UI
@@ -645,7 +645,15 @@ bindKeyInput("compatModel", "compatibleModel", maybeResumeOpening);
 bindKeyInput("elevenLabsKey", "elevenLabsApiKey", applyTtsVisibility);
 
 // Build the model dropdown grouped by provider (options come from api.js).
+// There is no default model: a disabled "Choose a model…" placeholder is the
+// initial selection, and the user must pick one (+ supply that provider's key)
+// to start.
 const modelSelectEl = $("modelSelect");
+const placeholderOpt = document.createElement("option");
+placeholderOpt.value = "";
+placeholderOpt.textContent = "Choose a model…";
+placeholderOpt.disabled = true;
+modelSelectEl.appendChild(placeholderOpt);
 for (const group of getModelOptions()) {
   const og = document.createElement("optgroup");
   og.label = group.label;
@@ -658,11 +666,12 @@ for (const group of getModelOptions()) {
   modelSelectEl.appendChild(og);
 }
 modelSelectEl.value = model;
-if (modelSelectEl.value !== model) {
-  // Stored value no longer in the list — fall back to the first option.
-  model = modelSelectEl.value || "claude-haiku-4-5";
-  localStorage.setItem("model", model);
+if (modelSelectEl.selectedIndex === -1) {
+  // No stored model, or a stored value no longer in the catalog → no default.
+  model = "";
+  localStorage.removeItem("model");
 }
+if (!model) modelSelectEl.selectedIndex = 0; // show the placeholder
 
 // Show only the key/endpoint settings for the selected model's provider; the
 // model select and ElevenLabs key always stay visible. Re-run on model change.
@@ -673,7 +682,8 @@ const PROVIDER_SETTING_IDS = {
   compatible: "set-compatible",
 };
 function applyProviderVisibility() {
-  const active = resolveModel(model).providerId;
+  // No model chosen yet → show no provider block (just the model picker).
+  const active = model ? resolveModel(model).providerId : null;
   for (const [pid, id] of Object.entries(PROVIDER_SETTING_IDS)) {
     const show = pid === active;
     $(id).classList.toggle("hidden", !show);
@@ -681,8 +691,13 @@ function applyProviderVisibility() {
     if (id === "set-compatible") $(id).open = show;
   }
 }
-// Focus the (visible) key field of the selected model's provider.
+// Focus what the user needs next: the model picker if nothing's chosen,
+// otherwise the visible key field of the selected model's provider.
 function focusActiveProviderKey() {
+  if (!model) {
+    modelSelectEl.focus();
+    return;
+  }
   const block = $(PROVIDER_SETTING_IDS[resolveModel(model).providerId]);
   block?.querySelector("input")?.focus();
 }

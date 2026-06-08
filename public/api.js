@@ -108,6 +108,7 @@ function getModelOptions() {
 // Is the selected model usable — i.e. is its provider's key (and, for the custom
 // endpoint, the base URL + model id) configured?
 function hasKeyForModel(selected) {
+  if (!selected) return false; // no model chosen yet
   const r = resolveModel(selected);
   if (r.providerId === "compatible") {
     return Boolean(getKey("compatibleBaseUrl") && getKey("compatibleModel"));
@@ -233,6 +234,7 @@ const OPENING_INSTRUCTION =
 class MissingKeyError extends Error {}
 
 async function complete({ model, system, messages, schema, maxTokens }) {
+  if (!model) throw new MissingKeyError("Choose a model in Settings (⚙) to start practicing.");
   const r = resolveModel(model);
   const out = await r.provider.complete({ modelId: r.modelId, system, messages, schema, maxTokens });
   return { text: out.text, usage: usagePayload(r.modelId, r.pricing, out.usage) };
