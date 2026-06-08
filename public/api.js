@@ -198,6 +198,17 @@ const TURN_SCHEMA = {
   additionalProperties: false,
 };
 
+// String fields of a turn the UI reads directly — used to backfill responses
+// from non-strict endpoints (mistake_tags, the lone array, is handled separately).
+const TURN_STRING_FIELDS = [
+  "learner_translation",
+  "corrected_message",
+  "natural_message",
+  "notes",
+  "reply_es",
+  "reply_en",
+];
+
 const OPENING_SCHEMA = {
   type: "object",
   properties: {
@@ -235,9 +246,8 @@ ${transcript || "(no conversation yet)"}
 
 // The AI starts each new session in character (greeting + a question), so the
 // learner doesn't face a blank chat. No correction fields — there's no learner
-// message yet. The client seeds its chat history with OPENING_HISTORY_SEED (in
-// app.js, kept in sync with this) so later turns still start with a valid user
-// message.
+// message yet. app.js (seedOpeningHistory) reuses this same constant to seed the
+// chat history, so later turns still start with a valid user message.
 const OPENING_INSTRUCTION =
   "Start the roleplay yourself: greet the learner in character and say one short, simple opening line (1-2 sentences, beginner-friendly) that fits the situation, ending with a question to get the conversation going. Produce only your in-character Spanish line and its English translation.";
 
@@ -272,15 +282,19 @@ async function apiChat({ situation, history = [], message, model }) {
     maxTokens: 16000,
   });
   const turn = parseStructured(text);
+  // Custom OpenAI-compatible endpoints run non-strict, so a backend may omit or
+  // mistype fields. Coerce everything the UI dereferences into a safe shape so
+  // a sloppy endpoint degrades to blanks instead of crashing the renderer.
+  for (const f of TURN_STRING_FIELDS) {
+    if (typeof turn[f] !== "string") turn[f] = "";
+  }
+  if (!Array.isArray(turn.mistake_tags)) turn.mistake_tags = [];
   // The model occasionally emits stray backslash artifacts in notes
   // (e.g. "\\an'" or "\\\\" where an em-dash belongs). Backslashes are never
   // legitimate in notes text, so drop those tokens.
   if (turn.notes) {
     turn.notes = turn.notes.replace(/\\+\S*/g, "").replace(/ {2,}/g, " ").trim();
   }
-  // Custom OpenAI-compatible endpoints run non-strict, so a backend may omit
-  // fields. Backfill the ones the UI dereferences so rendering can't throw.
-  if (!Array.isArray(turn.mistake_tags)) turn.mistake_tags = [];
   return { ...turn, usage };
 }
 
@@ -290,9 +304,12 @@ async function apiOpening({ situation, model }) {
     system: chatSystemPrompt(situation),
     messages: [{ role: "user", content: OPENING_INSTRUCTION }],
     schema: OPENING_SCHEMA,
-    maxTokens: 4000,
+    maxTokens: 6000,
   });
-  return { ...parseStructured(text), usage };
+  const turn = parseStructured(text);
+  if (typeof turn.reply_es !== "string") turn.reply_es = "";
+  if (typeof turn.reply_en !== "string") turn.reply_en = "";
+  return { ...turn, usage };
 }
 
 async function apiTutor({ history = [], question, transcript = "", model }) {
@@ -365,7 +382,7 @@ async function apiScenario({ model }) {
       },
     ],
     schema: SCENARIO_SCHEMA,
-    maxTokens: 2000,
+    maxTokens: 6000,
   });
   return { ...parseStructured(text), usage };
 }
@@ -472,13 +489,21 @@ async function openaiStyleCall({ url, key, modelId, system, messages, schema, ma
 async function geminiComplete({ modelId, system, messages, schema, maxTokens }) {
   const key = getKey("geminiApiKey");
   if (!key) throw new MissingKeyError("Add your Google Gemini API key in Settings (⚙) to use this model.");
+  // Gemini 2.5 models always "think", and thinking tokens count against
+  // maxOutputTokens — so an answer budget can be entirely consumed by reasoning,
+  // leaving an empty response. Cap the thinking budget (these are simple
+  // structured tasks) and add matching headroom on top of the answer budget.
+  const thinkBudget = 1024;
   const body = {
     systemInstruction: { parts: [{ text: system }] },
     contents: messages.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     })),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: {
+      maxOutputTokens: maxTokens + thinkBudget,
+      thinkingConfig: { thinkingBudget: thinkBudget },
+    },
   };
   if (schema) {
     body.generationConfig.responseMimeType = "application/json";

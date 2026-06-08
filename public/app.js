@@ -157,6 +157,22 @@ function resetAudio() {
   audioCache.clear();
 }
 
+// Browsers populate the voice list asynchronously: getVoices() is often empty
+// until a `voiceschanged` event fires shortly after load. Kick the load early
+// and expose a promise so the first clip can wait for voices instead of falling
+// back to the default voice (and missing the gender match). Resolves anyway
+// after a short timeout — some browsers never fire the event.
+function speechVoicesReady() {
+  if (typeof speechSynthesis === "undefined") return Promise.resolve();
+  if (speechSynthesis.getVoices().length) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => resolve();
+    speechSynthesis.addEventListener("voiceschanged", done, { once: true });
+    setTimeout(done, 1000);
+  });
+}
+if (typeof speechSynthesis !== "undefined") speechSynthesis.getVoices(); // warm up
+
 // Best-effort browser voice: a Castilian (es-ES) voice, preferring one whose
 // name matches the partner's gender, consistent per session. Browsers don't
 // expose voice gender, so this is a name heuristic that degrades gracefully.
@@ -182,15 +198,23 @@ function speakBrowser(text, slow, btn) {
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "es-ES";
   u.rate = slow ? 0.7 : 1.0;
-  const v = pickBrowserVoice(voiceGender);
-  if (v) u.voice = v;
   currentAudio = { btn, browser: true, utterance: u };
   btn.classList.add("playing");
   btn.textContent = "⏹";
   u.onend = u.onerror = () => {
     if (currentAudio?.utterance === u) stopAudio();
   };
-  speechSynthesis.speak(u);
+  const speak = () => {
+    if (currentAudio?.utterance !== u) return; // stopped/superseded while waiting
+    const v = pickBrowserVoice(voiceGender);
+    if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  };
+  // Voices are usually loaded already (resolves synchronously → speak this same
+  // tick, preserving the user gesture for click-initiated playback); on a cold
+  // first clip we wait for the voice list so the gender match still applies.
+  if (speechSynthesis.getVoices().length) speak();
+  else speechVoicesReady().then(speak);
 }
 
 // `auto` = autoplay-initiated: fail silently (don't flash ⚠ if a browser blocks
@@ -381,14 +405,11 @@ function resetUsage() {
 }
 
 // ---- Conversation flow ----
-// The AI opens each new session. We seed chatHistory with this instruction
-// (kept in sync with OPENING_INSTRUCTION in api.js) so the history sent on
-// later turns starts with a valid user message.
-const OPENING_HISTORY_SEED =
-  "Start the roleplay yourself: greet the learner in character and say one short, simple opening line (1-2 sentences, beginner-friendly) that fits the situation, ending with a question to get the conversation going. Produce only your in-character Spanish line and its English translation.";
-
+// The AI opens each new session. We seed chatHistory with the same instruction
+// the opening call used (OPENING_INSTRUCTION, a global from api.js, which loads
+// first) so the history sent on later turns starts with a valid user message.
 function seedOpeningHistory() {
-  chatHistory.push({ role: "user", content: OPENING_HISTORY_SEED });
+  chatHistory.push({ role: "user", content: OPENING_INSTRUCTION });
   chatHistory.push({ role: "assistant", content: opening.reply_es });
   transcript.push(`Teacher: ${opening.reply_es}`);
 }
