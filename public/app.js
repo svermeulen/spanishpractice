@@ -561,14 +561,16 @@ async function sendTutorQuestion(text, existingMsg = null) {
 }
 
 // ---- Session setup ----
-// The 🤖 button previews the hidden AI-facing prompt: while hovered, the header
-// label flips from "Situation: <learner text>" to "AI Prompt: <ai persona>".
-let showingAiPrompt = false;
+// The header label shows the learner-facing situation; it ellipsizes when long,
+// so its tooltip carries the full text. The 🤖 button's tooltip surfaces the
+// hidden AI-facing prompt (no label swapping).
 function renderSituationLabel() {
-  $("situationLabel").textContent =
-    showingAiPrompt && situation
-      ? `AI Prompt: ${situation}`
-      : `Situation: ${situationDisplay}`;
+  const label = $("situationLabel");
+  label.textContent = `Situation: ${situationDisplay}`;
+  label.title = situationDisplay ? `Situation: ${situationDisplay}` : "";
+  $("aiPromptBtn").title = situation
+    ? `AI prompt: ${situation}`
+    : "Shows the hidden AI prompt once a situation is generated";
 }
 function showMain() {
   renderSituationLabel();
@@ -677,17 +679,6 @@ async function startRandomSession() {
 }
 
 $("randomizeBtn").addEventListener("click", startRandomSession);
-
-// 🤖 preview: while hovered/focused, show the hidden AI-facing prompt.
-const aiPromptBtn = $("aiPromptBtn");
-function setAiPromptPreview(on) {
-  showingAiPrompt = on;
-  renderSituationLabel();
-}
-aiPromptBtn.addEventListener("mouseenter", () => setAiPromptPreview(true));
-aiPromptBtn.addEventListener("mouseleave", () => setAiPromptPreview(false));
-aiPromptBtn.addEventListener("focus", () => setAiPromptPreview(true));
-aiPromptBtn.addEventListener("blur", () => setAiPromptPreview(false));
 
 // Edit (✎) → type an explicit situation inline. The typed text is used as both
 // the header description and the AI prompt (via normalizeScenario's string path).

@@ -399,12 +399,12 @@ const SCENARIO_SCHEMA = {
     learner: {
       type: "string",
       description:
-        'What the learner sees: the situation and the learner\'s own role, addressed as "You". 1-2 sentences in English. Do not describe the AI partner here.',
+        'What the learner sees in a small header, so keep it SHORT: one concise sentence (roughly 8–16 words) naming the situation and the learner\'s own role, addressed as "You". Do not describe the AI partner here.',
     },
     ai: {
       type: "string",
       description:
-        'Hidden from the learner, used to instruct the model: the setting plus the AI roleplay partner\'s persona/role, addressed as "You". 1-2 sentences in English.',
+        'Hidden from the learner, used to instruct the model: the setting plus the AI roleplay partner\'s persona/role and any helpful detail, addressed as "You". As long as is genuinely helpful (1–3 sentences).',
     },
     voice_gender: {
       type: "string",
@@ -419,9 +419,9 @@ const SCENARIO_SCHEMA = {
 
 function scenarioSystemPrompt(level = DEFAULT_LEVEL) {
   const lvl = getLevel(level);
-  return `You generate a single roleplay scenario for an English speaker practicing Spanish who is moving to Spain. Set it in Spain (vary the cities and regions) and assume Castilian Spanish. The learner is at CEFR level ${level}, so make it ${lvl.scenario}. Return two fields, both 1-2 sentences in English:
-- "learner": shown to the learner — the situation and the LEARNER's own role, addressed as "You". Do not describe the AI partner.
-- "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". Match the complexity to the learner's level.
+  return `You generate a single roleplay scenario for an English speaker practicing Spanish who is moving to Spain. Set it in Spain (vary the cities and regions) and assume Castilian Spanish. The learner is at CEFR level ${level}, so make it ${lvl.scenario}. Return these fields in English:
+- "learner": shown to the learner in a small header, so keep it SHORT — one concise sentence (roughly 8–16 words) naming the situation and the LEARNER's own role, addressed as "You". Do not describe the AI partner.
+- "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". This can be as long as is genuinely helpful (1–3 sentences). Match the complexity to the learner's level.
 - "voice_gender": "male" or "female" — the AI partner's gender, so a matching voice can be picked for audio.
 
 Example:
