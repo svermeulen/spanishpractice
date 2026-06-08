@@ -169,7 +169,7 @@ const TURN_SCHEMA = {
     notes: {
       type: "string",
       description:
-        "Brief explanation of the corrections and any useful tips, in English. Empty string if the message was already fine. If natural_message is provided, briefly say why it's the more natural phrasing. Follow the system prompt's policy on accents/punctuation.",
+        "Teaching notes in English that add something the learner CANNOT already see from the before/after correction and the natural_message — do NOT restate what you changed or repeat the natural phrasing. Use it for the underlying rule or reason behind a fix (so they can generalize it next time), a genuinely useful tip, a common pitfall to avoid, or a usage/register/regional nuance. One or two short sentences. Empty string when the correction is self-explanatory and there's nothing new worth adding — prefer empty over filler. Follow the system prompt's policy on accents/punctuation.",
     },
     mistake_tags: {
       type: "array",
@@ -299,7 +299,9 @@ Stay in character as a person who makes sense in this situation.
 
 ${accentPolicy}
 
-For every learner message, produce the structured turn data: your interpretation of their intent, the corrected version of their message (close to their attempt, errors fixed), the natural version (only when a native would phrase it noticeably differently), correction notes, mistake category tags, and your in-character reply with its English translation.`;
+The learner sees the before/after correction and the natural version on their own, so don't waste the notes field restating them. Use notes only to add something they can't already see: the rule or reason behind a fix so they can apply it next time, a quick tip, a common pitfall, or a usage nuance. If there's nothing worth adding, leave notes empty rather than narrating the obvious.
+
+For every learner message, produce the structured turn data: your interpretation of their intent, the corrected version of their message (close to their attempt, errors fixed), the natural version (only when a native would phrase it noticeably differently), notes (only genuinely new teaching value — see above), mistake category tags, and your in-character reply with its English translation.`;
 }
 
 function tutorSystemPrompt(transcript, level = DEFAULT_LEVEL) {
