@@ -241,7 +241,7 @@ header {
 .settings-card {
   position: relative;
   width: 100%;
-  max-width: 420px;
+  max-width: 520px;
   margin-top: min(7vh, 52px);
   max-height: calc(100vh - 40px - min(7vh, 52px));
   overflow-y: auto;
