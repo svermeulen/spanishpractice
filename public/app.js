@@ -1672,7 +1672,7 @@ onbProviderEl.addEventListener("change", () => renderOnbFields(onbProviderEl.val
 
 function showOnboarding() {
   const pid = model && resolveModel(model).providerId;
-  onbProviderEl.value = ONB_PROVIDERS.some((p) => p.id === pid) ? pid : "anthropic";
+  onbProviderEl.value = ONB_PROVIDERS.some((p) => p.id === pid) ? pid : "gemini";
   onbLevelEl.value = level;
   renderOnbFields(onbProviderEl.value);
   onbOverlay.classList.remove("hidden");
