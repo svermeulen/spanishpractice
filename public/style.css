@@ -1,52 +1,84 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ---- Theming ----
+   Two independent axes:
+   • color theme  → html[data-theme="classic|terracotta|indigo|sage"]
+   • light / dark → html.dark (set by JS from the Appearance setting / OS)
+   State colors (del/ins/soft) and shadows depend only on light/dark; the rest of
+   the palette depends on the theme too. Both are applied by an inline <head>
+   script before first paint (no flash) and kept in sync by applyTheme() in app.js. */
+
+/* State colors + shadows — theme-independent, by light/dark */
 :root {
-  --bg: #f5f3ef;
-  --pane-bg: #ffffff;
-  --pane-alt: #faf8f5;
-  --bubble-alt: #edeae3;
-  --border: #e3e0d9;
-  --text: #2b2a27;
-  --muted: #8a877f;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --bubble-grad-a: #3b82f6;
-  --bubble-grad-b: #2563eb;
-  --del: #b91c1c;
-  --del-bg: #fee2e2;
-  --ins: #15803d;
-  --ins-bg: #dcfce7;
-  --soft: #b45309;
-  --soft-bg: #fef3c7;
+  --del: #b91c1c; --del-bg: #fee2e2;
+  --ins: #15803d; --ins-bg: #dcfce7;
+  --soft: #b45309; --soft-bg: #fef3c7;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 0, 0.04);
   --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.07);
+  color-scheme: light;
+}
+html.dark {
+  --del: #f87171; --del-bg: rgba(185, 28, 28, 0.22);
+  --ins: #4ade80; --ins-bg: rgba(21, 128, 61, 0.22);
+  --soft: #fbbf24; --soft-bg: rgba(180, 83, 9, 0.22);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
+  --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #151412;
-    --pane-bg: #1e1d1a;
-    --pane-alt: #232220;
-    --bubble-alt: #2c2b27;
-    --border: #353430;
-    --text: #e9e7e2;
-    --muted: #9c998f;
-    --accent: #5b94f5;
-    --accent-hover: #7caaf8;
-    --bubble-grad-a: #2f6fe0;
-    --bubble-grad-b: #2459c4;
-    --del: #f87171;
-    --del-bg: rgba(185, 28, 28, 0.22);
-    --ins: #4ade80;
-    --ins-bg: rgba(21, 128, 61, 0.22);
-    --soft: #fbbf24;
-    --soft-bg: rgba(180, 83, 9, 0.22);
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
-    --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
-  }
+/* Color palettes — light (classic is the default when no data-theme is set) */
+:root,
+html[data-theme="classic"] {
+  --bg: #f5f6f8; --pane-bg: #ffffff; --pane-alt: #f4f6f9; --bubble-alt: #eceff3;
+  --border: #e3e6ec; --text: #1f2733; --muted: #6f7989;
+  --accent: #3f6fe0; --accent-hover: #335fd0;
+  --bubble-grad-a: #5b8af2; --bubble-grad-b: #3f6fe0;
+}
+html[data-theme="terracotta"] {
+  --bg: #f5f1ea; --pane-bg: #fffdf9; --pane-alt: #f3ede3; --bubble-alt: #ece3d6;
+  --border: #e6ddcf; --text: #2c2620; --muted: #8c8275;
+  --accent: #c15f3c; --accent-hover: #a64e2e;
+  --bubble-grad-a: #d4764f; --bubble-grad-b: #c15f3c;
+}
+html[data-theme="indigo"] {
+  --bg: #f6f6f9; --pane-bg: #ffffff; --pane-alt: #f3f3f8; --bubble-alt: #eaeaf4;
+  --border: #e4e4ee; --text: #20202b; --muted: #6f6f80;
+  --accent: #5b5bd6; --accent-hover: #4a4ac4;
+  --bubble-grad-a: #7c7cf0; --bubble-grad-b: #5b5bd6;
+}
+html[data-theme="sage"] {
+  --bg: #f1f4f1; --pane-bg: #ffffff; --pane-alt: #eef2ee; --bubble-alt: #e2ebe4;
+  --border: #dde5dd; --text: #232825; --muted: #76817a;
+  --accent: #2f8f78; --accent-hover: #267965;
+  --bubble-grad-a: #44a98f; --bubble-grad-b: #2f8f78;
 }
 
-html { color-scheme: light dark; }
+/* Color palettes — dark */
+html.dark[data-theme="classic"],
+html.dark:not([data-theme]) {
+  --bg: #14161b; --pane-bg: #1e2128; --pane-alt: #23262e; --bubble-alt: #2c303a;
+  --border: #343843; --text: #e7e9ee; --muted: #99a1b0;
+  --accent: #6f9cf6; --accent-hover: #8aafff;
+  --bubble-grad-a: #3a63cf; --bubble-grad-b: #2f56be;
+}
+html.dark[data-theme="terracotta"] {
+  --bg: #18130e; --pane-bg: #221c15; --pane-alt: #281f17; --bubble-alt: #2f261c;
+  --border: #3a2f23; --text: #ece4d9; --muted: #a3978a;
+  --accent: #db8460; --accent-hover: #e89a78;
+  --bubble-grad-a: #b56743; --bubble-grad-b: #9e5230;
+}
+html.dark[data-theme="indigo"] {
+  --bg: #16161b; --pane-bg: #20202a; --pane-alt: #25252f; --bubble-alt: #2d2d3a;
+  --border: #353543; --text: #e8e8ef; --muted: #9898a8;
+  --accent: #8b8bf2; --accent-hover: #a3a3ff;
+  --bubble-grad-a: #5a5ad0; --bubble-grad-b: #4a4ac0;
+}
+html.dark[data-theme="sage"] {
+  --bg: #121613; --pane-bg: #1c211d; --pane-alt: #212722; --bubble-alt: #28302a;
+  --border: #323a34; --text: #e6ebe6; --muted: #909a92;
+  --accent: #4fb89c; --accent-hover: #66cdb0;
+  --bubble-grad-a: #2f8f78; --bubble-grad-b: #267a66;
+}
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -354,9 +386,10 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease, box-shadow 0.15s ease;
 }
-.input-row button:hover:not(:disabled) { background: var(--accent-hover); }
+.input-row button:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16); }
 .input-row button:active:not(:disabled) { transform: scale(0.97); }
 .input-row button:disabled { opacity: 0.45; cursor: default; }
 
@@ -650,8 +683,9 @@ body.no-tts .tts-only { display: none; }
   border: none;
   border-radius: 9px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-.onb-start:hover:not(:disabled) { background: var(--accent-hover); }
+.onb-start:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16); }
 .onb-start:disabled { opacity: 0.45; cursor: default; }
 .onb-fine { font-size: 11.5px; line-height: 1.45; color: var(--muted); }

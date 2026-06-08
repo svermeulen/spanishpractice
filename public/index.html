@@ -4,6 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spanish Practice</title>
+  <script>
+    // Apply the saved color theme + light/dark before first paint, to avoid a
+    // flash of the default theme. Kept in sync afterward by applyTheme() in app.js.
+    (function () {
+      try {
+        var d = document.documentElement;
+        d.setAttribute("data-theme", localStorage.getItem("theme") || "classic");
+        var a = localStorage.getItem("appearance") || "system";
+        var dark = a === "dark" || (a === "system" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+        d.classList.toggle("dark", dark);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="manifest" href="manifest.json" />
@@ -52,6 +65,16 @@
               <label class="setting setting-row">
                 <span>Level</span>
                 <select id="levelSelect"></select>
+              </label>
+
+              <h3 class="settings-section">Appearance</h3>
+              <label class="setting setting-row">
+                <span>Theme</span>
+                <select id="themeSelect"></select>
+              </label>
+              <label class="setting setting-row">
+                <span>Mode</span>
+                <select id="appearanceSelect"></select>
               </label>
 
               <h3 class="settings-section">Conversation</h3>

@@ -966,6 +966,74 @@ levelSelectEl.addEventListener("change", () => {
   localStorage.setItem("level", level);
 });
 
+// ---- Appearance: color theme + light/dark ----
+// Two axes: a color theme (data-theme on <html>) and light/dark (the .dark
+// class, derived from the Appearance setting / OS). An inline <head> script sets
+// both before first paint; this keeps them in sync and updates the mobile
+// theme-color. CSS palettes live in style.css under "Theming".
+const THEMES = [
+  { value: "classic", label: "Classic blue" },
+  { value: "terracotta", label: "Terracotta" },
+  { value: "indigo", label: "Indigo" },
+  { value: "sage", label: "Sage" },
+];
+const APPEARANCES = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+let theme = localStorage.getItem("theme") || "classic";
+let appearance = localStorage.getItem("appearance") || "system";
+if (!THEMES.some((t) => t.value === theme)) theme = "classic";
+if (!APPEARANCES.some((a) => a.value === appearance)) appearance = "system";
+
+function systemPrefersDark() {
+  return Boolean(window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+}
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", theme);
+  const dark = appearance === "dark" || (appearance === "system" && systemPrefersDark());
+  document.documentElement.classList.toggle("dark", dark);
+  // Match the mobile browser chrome to the active accent.
+  const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && accent) meta.setAttribute("content", accent);
+}
+
+function fillSelect(el, options, value) {
+  for (const o of options) {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.label;
+    el.appendChild(opt);
+  }
+  el.value = value;
+}
+
+const themeSelectEl = $("themeSelect");
+fillSelect(themeSelectEl, THEMES, theme);
+themeSelectEl.addEventListener("change", () => {
+  theme = themeSelectEl.value;
+  localStorage.setItem("theme", theme);
+  applyTheme();
+});
+
+const appearanceSelectEl = $("appearanceSelect");
+fillSelect(appearanceSelectEl, APPEARANCES, appearance);
+appearanceSelectEl.addEventListener("change", () => {
+  appearance = appearanceSelectEl.value;
+  localStorage.setItem("appearance", appearance);
+  applyTheme();
+});
+
+// Follow the OS when Appearance is "System".
+if (window.matchMedia) {
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (appearance === "system") applyTheme();
+  });
+}
+applyTheme();
+
 const autoShowEnEl = $("autoShowEn");
 autoShowEnEl.checked = autoShowEn;
 autoShowEnEl.addEventListener("change", () => {

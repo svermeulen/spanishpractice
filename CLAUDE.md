@@ -46,10 +46,19 @@ Defined in the `KEYMAP` object in `public/app.js`; rebindable without code chang
 
 The ⚙ button in the header opens a centered **modal** (`#settingsPopup` = `.settings-overlay` backdrop → `.settings-card`; the same overlay/card pattern as onboarding) with all per-user settings (persisted in localStorage, applied immediately), organized for readability:
 - **Top:** the model select (grouped by provider, built from `getModelOptions()`) and the difficulty **level** select (`level`, CEFR A1–B2 from `getLevelOptions()`, default `A1`, applied to subsequent turns).
+- **"Appearance" section:** a **Theme** select (`theme` — color palette: `classic` / `terracotta` / `indigo` / `sage`, default `classic`) and a **Mode** select (`appearance` — `system` / `light` / `dark`, default `system`). See **Theming** below.
 - **"Conversation" section:** auto-show translations (`autoShowEn`), auto-show notes (`autoShowNotes`), correct accents & punctuation (`checkAccents`, default off / lenient — see the diff notes above), auto-play replies (`autoPlayAudio`, default on — a `.tts-only` row hidden when no audio backend is available), show session cost (`showCost`, default on).
 - **Collapsed "API keys & custom endpoint" disclosure** (`#set-keys`, a `<details>`): per-provider keys (Anthropic / OpenAI / Gemini), the optional ElevenLabs key that gates the 🔊 buttons, and the nested "Custom OpenAI-compatible endpoint" disclosure (base URL / key / model id). Tucked away because keys are set-once; `applyProviderVisibility()` shows only the selected provider's key block (`#set-anthropic` / `#set-openai` / `#set-gemini` / `#set-compatible`) on load and on every model change, and **auto-opens `#set-keys`** when the chosen model's provider isn't keyed yet so the field is findable.
 
 Only the key for the selected model's provider is needed to chat; supplying it (or switching to a model whose provider is already configured) auto-resumes the opening. Closed by the × button, an `Esc` press, or a click on the backdrop (outside the card).
+
+## Theming
+
+Two independent axes, both driven off `<html>` and applied via CSS custom properties (see the "Theming" block at the top of `style.css`):
+- **Color theme** → `html[data-theme="classic|terracotta|indigo|sage"]` selects a palette (bg/pane/border/text/muted/accent/bubble-gradient). `classic` (a refined, softer blue — the old `#2563eb` was harsh on the warm bg) is the default and also the fallback when `data-theme` is absent.
+- **Light/dark** → `html.dark` (a class, NOT the `prefers-color-scheme` media query) toggles the dark palette. Decoupling it from the media query is what lets the **Mode** setting force light/dark regardless of OS. State colors (del/ins/soft) and shadows depend only on light/dark and are theme-independent; the rest of the palette is per-theme. Each theme therefore has a light block (`html[data-theme="x"]`) and a dark block (`html.dark[data-theme="x"]`); `color-scheme` is set to match so native controls/scrollbars follow.
+
+Applied in two places: an **inline `<head>` script** sets `data-theme` + `.dark` from localStorage before first paint (no flash), and **`applyTheme()` in `app.js`** keeps them in sync on change, updates the mobile `<meta name="theme-color">` to the active `--accent`, and re-runs on OS scheme changes while Mode is `system`. The `THEMES` / `APPEARANCES` lists in `app.js` build the two selects and validate stored values. Brand assets (icon/PWA/OG) stay blue regardless of the in-app theme.
 
 ## Roadmap (discussed, not yet built)
 
