@@ -2,8 +2,7 @@
   "name": "spanishpractice",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
-  "description": "Client-only Spanish practice web app: roleplay chat with diff-rendered corrections and a tutor side panel. Bring your own AI API key (Anthropic / OpenAI / Gemini / OpenAI-compatible) plus optional ElevenLabs for audio.",
+  "description": "Client-only Spanish practice web app: AI roleplay chat with diff-rendered corrections and a tutor side panel. Bring your own AI API key (Anthropic / OpenAI / Gemini / OpenAI-compatible) plus optional ElevenLabs for audio.",
   "homepage": "https://spanishpractice.app",
   "license": "MIT",
   "repository": {
@@ -11,10 +10,6 @@
     "url": "https://github.com/svermeulen/spanishpractice.git"
   },
   "scripts": {
-    "start": "python3 -m http.server 3000 --directory public",
-    "generate-scenarios": "node scripts/generate-scenarios.mjs"
-  },
-  "devDependencies": {
-    "@anthropic-ai/sdk": "^0.102.0"
+    "start": "python3 -m http.server 3000 --directory public"
   }
 }

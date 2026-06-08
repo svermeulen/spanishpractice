@@ -447,13 +447,22 @@ async function sendTutorQuestion(text, existingMsg = null) {
 }
 
 // ---- Session setup ----
+// The 🤖 button previews the hidden AI-facing prompt: while hovered, the header
+// label flips from "Situation: <learner text>" to "AI Prompt: <ai persona>".
+let showingAiPrompt = false;
+function renderSituationLabel() {
+  $("situationLabel").textContent =
+    showingAiPrompt && situation
+      ? `AI Prompt: ${situation}`
+      : `Situation: ${situationDisplay}`;
+}
 function showMain() {
-  $("situationLabel").textContent = `Situation: ${situationDisplay}`;
+  renderSituationLabel();
   $("chatInput").focus();
 }
 
-// A scenario is either an {learner, ai} object (generated deck) or a plain
-// string (custom situation, or the old single-string scenarios.json format).
+// A scenario is either an {learner, ai} object (AI-generated) or a plain string
+// (a custom situation typed via ✎, used for both fields).
 // learner = what's shown to the user; ai = the persona fed to the prompt.
 function normalizeScenario(scenario) {
   if (typeof scenario === "string") return { learner: scenario, ai: scenario };
@@ -470,10 +479,10 @@ function addTutorIntro() {
   addEl(msg, "div", "bubble", TUTOR_INTRO);
 }
 
-function startSession(scenario) {
-  const sc = normalizeScenario(scenario);
-  situation = sc.ai;
-  situationDisplay = sc.learner;
+// Clear all per-session state and the panes. Does not set a scenario or fire
+// the opening — callers do that (synchronously for a typed/known scenario, or
+// after an async generation for a random one).
+function resetSessionState() {
   sessionId = crypto.randomUUID();
   turns = [];
   tutorTurns = [];
@@ -487,49 +496,75 @@ function startSession(scenario) {
   chatMessagesEl.innerHTML = "";
   tutorMessagesEl.innerHTML = "";
   addTutorIntro();
+}
+
+// Start a session from a known scenario (typed situation or demo).
+function startSession(scenario) {
+  resetSessionState();
+  const sc = normalizeScenario(scenario);
+  situation = sc.ai;
+  situationDisplay = sc.learner;
   showMain();
   // Have the AI open the conversation in character (skipped in demo mode, and
-  // a no-op until a model+key is configured — generateOpening guards on that,
-  // so the onboarding modal / key entry resumes it).
+  // a no-op until a model+key is configured — generateOpening guards on that).
   if (!isDemo) generateOpening();
 }
 
-// ---- Random scenario deck ----
-// Cycles through public/scenarios.json in a shuffled order persisted in
-// localStorage, so nothing repeats until the whole deck is exhausted.
-let scenarios = [];
-const scenariosLoaded = fetch("scenarios.json")
-  .then((r) => r.json())
-  .then((d) => (scenarios = d))
-  .catch(() => {});
-
-function drawFromDeck() {
-  let deck = null;
-  try {
-    deck = JSON.parse(localStorage.getItem("scenarioDeck"));
-  } catch {}
-  if (!deck || !Array.isArray(deck.order) || deck.order.length !== scenarios.length || deck.cursor >= deck.order.length) {
-    const order = [...scenarios.keys()];
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
-    }
-    deck = { order, cursor: 0 };
-  }
-  const scenario = scenarios[deck.order[deck.cursor]];
-  deck.cursor++;
-  localStorage.setItem("scenarioDeck", JSON.stringify(deck));
-  return scenario;
-}
-
-// Start (or restart) a conversation with a fresh random scenario.
+// ---- Dynamic scenarios ----
+// Each new conversation generates a fresh scenario via the AI (cheap call on the
+// configured model), then opens in character. Replaces the old pre-generated
+// public/scenarios.json deck.
+let scenarioInFlight = false;
 async function startRandomSession() {
-  await scenariosLoaded;
-  if (!scenarios.length) return;
-  startSession(drawFromDeck());
+  if (scenarioInFlight) return;
+  if (!hasKeyForModel(model)) {
+    showOnboarding();
+    return;
+  }
+  resetSessionState();
+  situation = "";
+  situationDisplay = "Generating a situation…";
+  showMain();
+
+  const input = $("chatInput");
+  const button = $("chatForm").querySelector("button");
+  input.disabled = true;
+  button.disabled = true;
+  const thinking = addThinking(chatMessagesEl);
+  scrollToBottom(chatMessagesEl);
+  scenarioInFlight = true;
+  try {
+    const sc = await apiScenario({ model });
+    trackUsage(sc.usage);
+    thinking.remove();
+    situation = sc.ai;
+    situationDisplay = sc.learner;
+    renderSituationLabel();
+    generateOpening(); // manages input enabled-state from here
+  } catch (err) {
+    thinking.remove();
+    situationDisplay = "Couldn't generate a situation";
+    renderSituationLabel();
+    input.disabled = false;
+    button.disabled = false;
+    addError(chatMessagesEl, err.message, startRandomSession);
+  } finally {
+    scenarioInFlight = false;
+  }
 }
 
 $("randomizeBtn").addEventListener("click", startRandomSession);
+
+// 🤖 preview: while hovered/focused, show the hidden AI-facing prompt.
+const aiPromptBtn = $("aiPromptBtn");
+function setAiPromptPreview(on) {
+  showingAiPrompt = on;
+  renderSituationLabel();
+}
+aiPromptBtn.addEventListener("mouseenter", () => setAiPromptPreview(true));
+aiPromptBtn.addEventListener("mouseleave", () => setAiPromptPreview(false));
+aiPromptBtn.addEventListener("focus", () => setAiPromptPreview(true));
+aiPromptBtn.addEventListener("blur", () => setAiPromptPreview(false));
 
 // Edit (✎) → type an explicit situation inline. The typed text is used as both
 // the header description and the AI prompt (via normalizeScenario's string path).
@@ -632,10 +667,13 @@ function bindKeyInput(id, storageKey, onChange) {
   });
 }
 // Supplying a key/endpoint (or switching to an already-configured provider)
-// kicks off the opening if it hasn't run yet — generateOpening self-guards on
-// model/key/session state, so this is safe to call freely.
+// gets a conversation going: generate a scenario if none exists yet, otherwise
+// (re)try a pending opening. Both downstream calls self-guard, so this is safe
+// to call freely from input/model change handlers.
 function maybeResumeOpening() {
-  generateOpening();
+  if (!hasKeyForModel(model)) return;
+  if (!situation) startRandomSession();
+  else generateOpening();
 }
 
 // Settings input id ↔ localStorage key. Used for binding and for reflecting
@@ -940,7 +978,7 @@ function startFromOnboarding() {
   applyProviderVisibility();
   applyTtsVisibility();
   hideOnboarding();
-  generateOpening();
+  startRandomSession();
 }
 
 onbStartEl.addEventListener("click", startFromOnboarding);
@@ -951,12 +989,12 @@ $("onbClose").addEventListener("click", () => {
 });
 
 // ---- Boot ----
-// No start screen: jump straight into a conversation with a random scenario.
-// First run (no usable model+key) shows the onboarding modal; the scenario
-// loads behind it and the opening fires once onboarding completes.
+// No start screen: configured users jump straight into a generated scenario;
+// first-run (no usable model+key) gets the onboarding modal, which kicks off
+// the first scenario once a provider + key are supplied.
 if (!isDemo) {
-  startRandomSession();
-  if (!hasKeyForModel(model)) showOnboarding();
+  if (hasKeyForModel(model)) startRandomSession();
+  else showOnboarding();
 }
 
 // Dev helper: ?demo renders a sample conversation without calling the API,

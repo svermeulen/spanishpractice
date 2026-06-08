@@ -21,7 +21,9 @@ provider you choose. Nothing is logged or proxied.
   time; it has the conversation transcript as context.
 - **Audio (optional)** — 🔊 buttons speak any line via ElevenLabs (⌥-click for
   slow), if you add an ElevenLabs key.
-- **100 scenarios** — a shuffled deck; 🎲 (or ⌘K) jumps to a new one.
+- **Fresh scenarios** — every conversation starts from an AI-generated
+  situation; 🎲 (or ⌘K) rolls a new one, ✎ lets you type your own, and 🤖
+  previews the hidden AI-facing prompt.
 - **Session cost ticker** — live token cost estimate per provider.
 
 ## Providers
@@ -54,15 +56,6 @@ npm start          # serves public/ at http://localhost:3000 (python3 http.serve
 > over `http://` — a hosted `https` page can't call `http://localhost` (browser
 > mixed-content block).
 
-## Regenerate the scenario deck
-
-The only thing that needs Node:
-
-```sh
-npm install
-ANTHROPIC_API_KEY=sk-ant-... npm run generate-scenarios   # rewrites public/scenarios.json
-```
-
 ## How it works
 
 - `public/api.js` — provider-adapter layer: a `PROVIDERS` registry where each
@@ -70,7 +63,7 @@ ANTHROPIC_API_KEY=sk-ant-... npm run generate-scenarios   # rewrites public/scen
   structured output (Anthropic `output_config`, OpenAI `response_format`, Gemini
   `responseSchema`). All calls go browser → provider directly with your key.
 - `public/app.js` — vanilla-JS UI: chat/tutor panes, the correction diff,
-  scenario deck, settings, and onboarding. No framework, no bundler.
+  scenario generation, settings, and onboarding. No framework, no bundler.
 - Deployed to GitHub Pages from `public/` via GitHub Actions on every push to
   `main` (see `.github/workflows/deploy.yml`).
 

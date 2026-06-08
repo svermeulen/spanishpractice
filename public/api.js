@@ -290,6 +290,64 @@ async function apiTutor({ history = [], question, transcript = "", model }) {
   return { answer: text, usage };
 }
 
+// ---- Scenario generation ----
+// Each conversation starts from a freshly AI-generated scenario (replacing the
+// old pre-generated deck). A random theme hint keeps the spread wide.
+const SCENARIO_SCHEMA = {
+  type: "object",
+  properties: {
+    learner: {
+      type: "string",
+      description:
+        'What the learner sees: the situation and the learner\'s own role, addressed as "You". 1-2 sentences in English. Do not describe the AI partner here.',
+    },
+    ai: {
+      type: "string",
+      description:
+        'Hidden from the learner, used to instruct the model: the setting plus the AI roleplay partner\'s persona/role, addressed as "You". 1-2 sentences in English.',
+    },
+  },
+  required: ["learner", "ai"],
+  additionalProperties: false,
+};
+
+const SCENARIO_SYSTEM = `You generate a single roleplay scenario for an English speaker practicing beginner Spanish who is moving to Spain. Set it in Spain (vary the cities and regions) and assume Castilian Spanish. Return two fields, both 1-2 sentences in English:
+- "learner": shown to the learner — the situation and the LEARNER's own role, addressed as "You". Do not describe the AI partner.
+- "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". Keep it simple enough for a beginner to navigate.
+
+Example:
+{"learner":"You're ordering lunch at a traditional restaurant in Madrid and asking the waiter for a recommendation.","ai":"A traditional restaurant in Madrid. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply."}`;
+
+const SCENARIO_THEMES = [
+  "ordering at a restaurant, bar, or café",
+  "shopping — market, bakery, pharmacy, phone shop, or clothes",
+  "public transport, a taxi, or asking for directions",
+  "housing & bureaucracy — renting, the NIE, the ayuntamiento, or the bank",
+  "the doctor, dentist, hairdresser, or gym",
+  "meeting neighbours or friends of friends; small talk",
+  "weekend plans, hobbies, the weather, or football",
+  "a local festival — San Fermín, Las Fallas, Semana Santa, a verbena",
+  "a family gathering or a meal at someone's home",
+  "something creative but beginner-friendly — a lost dog in the park, a cooking class going slightly wrong, a chatty taxi driver who used to be a bullfighter, a flamenco class, finding a wallet, a game-show contestant",
+];
+
+async function apiScenario({ model }) {
+  const theme = SCENARIO_THEMES[Math.floor(Math.random() * SCENARIO_THEMES.length)];
+  const { text, usage } = await complete({
+    model,
+    system: SCENARIO_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `Invent one fresh scenario. Setting/theme to use: ${theme}. Make it specific and avoid the most obvious cliché.`,
+      },
+    ],
+    schema: SCENARIO_SCHEMA,
+    maxTokens: 2000,
+  });
+  return { ...JSON.parse(text), usage };
+}
+
 // ---- Provider adapters ----
 // Each returns { text, usage } with usage carrying { input_tokens, output_tokens }
 // (Anthropic additionally carries cache_* fields, used by computeCost).
