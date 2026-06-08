@@ -311,8 +311,14 @@ function revealBody(body, nowHidden) {
   if (!nowHidden) body.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
-function addToggle(parent, label, bodyText, bodyClass, visible = false) {
+// Tooltip hints for the inline message toggles — they teach the global ⌘E/⌘I
+// shortcuts (which auto-show/hide all translations / notes at once).
+const EN_TIP = "Show/hide the translation · ⌘E toggles all";
+const NOTES_TIP = "Show/hide the notes · ⌘I toggles all";
+
+function addToggle(parent, label, bodyText, bodyClass, visible = false, tip = null) {
   const toggle = addEl(parent, "span", "notes-toggle", label);
+  if (tip) attachTooltip(toggle, () => tip, { delay: 350 });
   const body = addEl(parent, "div", bodyClass, bodyText);
   if (!visible) body.classList.add("hidden");
   toggle.addEventListener("click", () => {
@@ -349,11 +355,12 @@ function addCorrectionBlock(msg, originalText, turn) {
   // following the auto-show-translations setting like teacher messages.
   const wrap = addEl(block, "div");
   const enToggle = addEl(wrap, "span", "en-toggle", "EN ▾");
+  attachTooltip(enToggle, () => EN_TIP, { delay: 350 });
   const enBody = addEl(wrap, "div", "en-body", turn.learner_translation);
   if (!autoShowEn) enBody.classList.add("hidden");
   enToggle.addEventListener("click", () => revealBody(enBody, enBody.classList.toggle("hidden")));
   if (turn.notes) {
-    addToggle(block, "Notes ▾", turn.notes, "notes-body", autoShowNotes);
+    addToggle(block, "Notes ▾", turn.notes, "notes-body", autoShowNotes, NOTES_TIP);
   }
 }
 
@@ -363,6 +370,7 @@ function addTeacherMessage(turn) {
   const speakBtn = addSpeakButton(bubble, () => turn.reply_es);
   const wrap = addEl(msg, "div");
   const toggle = addEl(wrap, "span", "en-toggle", "EN ▾");
+  attachTooltip(toggle, () => EN_TIP, { delay: 350 });
   const body = addEl(wrap, "div", "en-body", turn.reply_en);
   if (!autoShowEn) body.classList.add("hidden");
   toggle.addEventListener("click", () => revealBody(body, body.classList.toggle("hidden")));
@@ -736,24 +744,53 @@ function hideTooltip(anchor) {
   tooltipAnchor = null;
 }
 
-function attachTooltip(el, getText) {
-  el.addEventListener("mouseenter", () => showTooltip(el, getText()));
-  el.addEventListener("mouseleave", () => hideTooltip(el));
-  el.addEventListener("focus", () => showTooltip(el, getText()));
-  el.addEventListener("blur", () => hideTooltip(el));
-  // Touch has no hover: tap the anchor to show, tap anywhere else to dismiss.
-  el.addEventListener("click", (e) => {
-    e.stopPropagation();
-    showTooltip(el, getText());
-  });
+// opts.delay: ms to wait before showing on hover/focus (0 = instant).
+// opts.tap: also show on tap — for pure-info anchors with no click action of
+// their own, so touch users (who have no hover) can still read them.
+function attachTooltip(el, getText, { delay = 0, tap = false } = {}) {
+  let timer = null;
+  const show = () => {
+    clearTimeout(timer);
+    if (delay) timer = setTimeout(() => showTooltip(el, getText()), delay);
+    else showTooltip(el, getText());
+  };
+  const hide = () => {
+    clearTimeout(timer);
+    hideTooltip(el);
+  };
+  el.addEventListener("mouseenter", show);
+  el.addEventListener("mouseleave", hide);
+  el.addEventListener("focus", show);
+  el.addEventListener("blur", hide);
+  if (tap) {
+    // Tap anywhere else dismisses (the document handler below).
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearTimeout(timer);
+      showTooltip(el, getText()); // tap reveals immediately, ignoring delay
+    });
+  }
 }
 document.addEventListener("click", () => hideTooltip());
 window.addEventListener("resize", () => hideTooltip());
 
-attachTooltip($("aiPromptBtn"), () =>
-  situation ? `AI prompt: ${situation}` : "The AI prompt appears once a situation is generated."
+// 🤖 prompt: instant (it's the one that felt broken). Situation label: delayed,
+// so it doesn't pop the moment the cursor crosses the header. Both tappable.
+attachTooltip(
+  $("aiPromptBtn"),
+  () => (situation ? `AI prompt: ${situation}` : "The AI prompt appears once a situation is generated."),
+  { tap: true }
 );
-attachTooltip($("situationLabel"), () => (situationDisplay ? `Situation: ${situationDisplay}` : ""));
+attachTooltip($("situationLabel"), () => (situationDisplay ? `Situation: ${situationDisplay}` : ""), {
+  delay: 450,
+  tap: true,
+});
+
+// Header action buttons: brief delayed hints (instant component, viewport-clamped)
+// replacing native title — so the ⌘K shortcut shows without the ~1s browser delay.
+attachTooltip($("randomizeBtn"), () => "New random situation · ⌘K", { delay: 350 });
+attachTooltip($("editBtn"), () => "Type your own situation", { delay: 350 });
+attachTooltip($("settingsBtn"), () => "Settings", { delay: 350 });
 
 // ---- Keyboard shortcuts ----
 // Defaults below. Rebind without code changes by setting localStorage key

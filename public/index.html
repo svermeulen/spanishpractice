@@ -30,8 +30,8 @@
   <div id="main" class="main">
     <header>
       <div class="situation-wrap">
-        <button id="randomizeBtn" class="icon-btn" title="New random situation (⌘K)">↻</button>
-        <button id="editBtn" class="icon-btn" title="Type your own situation">✎</button>
+        <button id="randomizeBtn" class="icon-btn" aria-label="New random situation">↻</button>
+        <button id="editBtn" class="icon-btn" aria-label="Type your own situation">✎</button>
         <button id="aiPromptBtn" class="icon-btn" aria-label="Show the AI prompt">🤖</button>
         <div id="situationLabel" class="situation-label"></div>
         <input id="situationInput" class="situation-input hidden" type="text" placeholder="Describe a situation, then press Enter..." autocomplete="off" />
@@ -39,7 +39,7 @@
       <div class="header-controls">
         <span id="costTicker" class="cost-ticker" title="Session cost so far">$0.00</span>
         <div class="settings-wrap">
-          <button id="settingsBtn" class="icon-btn" title="Settings" aria-haspopup="true" aria-expanded="false">⚙</button>
+          <button id="settingsBtn" class="icon-btn" aria-label="Settings" aria-haspopup="true" aria-expanded="false">⚙</button>
           <div id="settingsPopup" class="settings-overlay hidden">
             <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
               <button id="settingsClose" class="onb-close" type="button" title="Close" aria-label="Close">×</button>
