@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Spanish Practice">
+  <!-- Speech bubble (chat) + ñ (Spanish). Bold and geometric so it reads at 16px. -->
+  <rect x="6" y="7" width="52" height="40" rx="12" fill="#2563eb"/>
+  <path d="M19 43 L19 58 L35 45 Z" fill="#2563eb"/>
+  <text x="32" y="39" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#ffffff">ñ</text>
+</svg>
