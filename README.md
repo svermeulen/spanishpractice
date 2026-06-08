@@ -23,9 +23,9 @@ provider you choose. Nothing is logged or proxied.
   auto-play by default. Works out of the box with your browser's built-in
   Spanish voices; add an ElevenLabs key for higher-quality, gender-matched
   voices.
-- **Voice input** — where the browser supports it, a 🎤 button lets you *speak*
-  your reply in Spanish; the transcript drops into the input for you to edit
-  before sending.
+- **Voice input** — where the browser supports it, flip the composer into voice
+  mode and tap to talk: speak your reply in Spanish, tap again to stop, and it
+  transcribes and sends automatically (`⌘⇧M` toggles recording).
 - **Gentle on accents** — missing accents (á, ñ) and inverted punctuation
   (¿ ¡) are forgiven by default (your keyboard may not have them); flip on
   "Correct accents & punctuation" in Settings to have them checked too.

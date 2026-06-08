@@ -384,7 +384,9 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.input-row button {
+/* The filled primary button (Send / Ask) — scoped to submit so the icon
+   toggle + voice button in the same row keep their own styles. */
+.input-row button[type="submit"] {
   padding: 12px 20px;
   font-size: 14px;
   font-weight: 500;
@@ -396,19 +398,19 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease, box-shadow 0.15s ease;
 }
-.input-row button:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16); }
-.input-row button:active:not(:disabled) { transform: scale(0.97); }
-.input-row button:disabled {
+.input-row button[type="submit"]:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16); }
+.input-row button[type="submit"]:active:not(:disabled) { transform: scale(0.97); }
+.input-row button[type="submit"]:disabled {
   background: var(--bubble-alt);
   color: var(--muted);
   box-shadow: none;
   cursor: default;
 }
 
-/* Voice-input (🎤) button — sits between the input and Send */
-.mic-btn {
+/* Keyboard ⇄ voice mode toggle (left of the input) */
+.mode-toggle {
   flex-shrink: 0;
-  padding: 0 14px;
+  padding: 0 13px;
   font-size: 17px;
   line-height: 1;
   background: transparent;
@@ -416,10 +418,30 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
   border-radius: 12px;
   cursor: pointer;
   color: var(--muted);
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
-.mic-btn:hover { border-color: var(--accent); color: var(--accent); }
-.mic-btn.recording {
+.mode-toggle:hover { border-color: var(--accent); color: var(--accent); }
+body.no-stt .mode-toggle { display: none; }
+
+/* Voice mode: the big tap-to-talk button that replaces the text input */
+.voice-btn {
+  flex: 1;
+  padding: 12px 15px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--pane-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.voice-btn:hover:not(:disabled) { border-color: var(--accent); }
+.voice-btn:disabled { opacity: 0.5; cursor: default; }
+.voice-btn.recording {
   color: #fff;
   background: var(--del);
   border-color: var(--del);
@@ -427,9 +449,8 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
 }
 @keyframes mic-pulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--del) 45%, transparent); }
-  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--del) 0%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--del) 0%, transparent); }
 }
-body.no-stt .mic-btn { display: none; }
 
 /* ---- Chat bubbles ---- */
 @keyframes rise-in {

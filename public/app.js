@@ -19,6 +19,8 @@ let opening = null; // {reply_es, reply_en} — the AI's in-character first mess
 let openingInFlight = false; // true while the opening request is running
 let sendInFlight = false; // true while a chat message is being answered
 let scenarioInFlight = false; // true while a new scenario is being generated
+let inputMode = localStorage.getItem("inputMode") || "keyboard"; // "keyboard" | "voice"
+let startStopRecording = () => {}; // voice toggle hook (set when STT is supported)
 let restoring = false; // true while rebuilding a saved session (suppresses autoplay)
 let chatHistory = []; // [{role, content}] — assistant entries are reply_es only
 let tutorHistory = [];
@@ -446,9 +448,13 @@ function seedOpeningHistory() {
 // only once a conversation is ready (an opening exists) and nothing is in flight
 // (scenario generation, the opening, or a previous message). Derived from state
 // and re-synced whenever it changes, so callers never poke the input/button by hand.
+function canSend() {
+  return Boolean(opening) && !scenarioInFlight && !openingInFlight && !sendInFlight;
+}
 function syncSendButton() {
-  const ready = Boolean(opening) && !scenarioInFlight && !openingInFlight && !sendInFlight;
-  $("chatForm").querySelector("button").disabled = !ready;
+  const ready = canSend();
+  $("sendBtn").disabled = !ready;
+  $("voiceBtn").disabled = !ready; // the voice recorder is gated the same way
 }
 
 async function generateOpening() {
@@ -806,6 +812,7 @@ const KEYMAP = {
   randomize: "meta+k", // restart with a new random situation
   toggleTranslations: "meta+e",
   toggleNotes: "meta+i", // expand/collapse all correction notes
+  toggleRecording: "meta+shift+m", // voice mode: start/stop recording
 };
 try {
   Object.assign(KEYMAP, JSON.parse(localStorage.getItem("keymap")) || {});
@@ -829,6 +836,9 @@ const SHORTCUT_ACTIONS = {
     const box = $("autoShowNotes");
     box.checked = !box.checked;
     box.dispatchEvent(new Event("change"));
+  },
+  toggleRecording() {
+    startStopRecording();
   },
 };
 
@@ -1147,78 +1157,110 @@ settingsPopup.addEventListener("click", (e) => {
   if (e.target === settingsPopup) toggleSettings(false);
 });
 
-// ---- Voice input (Web Speech API) ----
-// Progressive enhancement: where the browser exposes SpeechRecognition, the 🎤
-// button dictates Spanish into the chat box. The transcript fills the input (not
-// auto-sent) so the learner can review/edit before pressing Send. The button is
-// hidden entirely where unsupported (Firefox, older Safari) via body.no-stt.
+// ---- Input mode: keyboard vs voice ----
+// Two composer modes, switched by the toggle left of the input (persisted as
+// `inputMode`). Keyboard: type + Send (default). Voice: a tap-to-talk recorder
+// (#voiceBtn) that transcribes Spanish and auto-sends on stop. Voice needs the
+// Web Speech API — where it's missing (Firefox, older Safari) the toggle is
+// hidden (body.no-stt) and we stay in keyboard mode.
 const SpeechRecognitionCls = window.SpeechRecognition || window.webkitSpeechRecognition;
-const MIC_TITLE = "Speak in Spanish";
-let stopVoiceInput = () => {}; // assigned below when supported; no-op otherwise
+const VOICE_IDLE = "🎤 Tap to talk";
+const VOICE_REC = "● Listening… tap to send";
 
-function setupVoiceInput() {
-  const micBtn = $("micBtn");
+function applyInputMode() {
+  if (!SpeechRecognitionCls) inputMode = "keyboard";
+  const voice = inputMode === "voice";
+  $("chatInput").classList.toggle("hidden", voice);
+  $("sendBtn").classList.toggle("hidden", voice);
+  $("voiceBtn").classList.toggle("hidden", !voice);
+  const toggle = $("modeToggle");
+  toggle.textContent = voice ? "⌨️" : "🎤";
+  toggle._tip = voice ? "Switch to typing" : "Switch to voice · ⌘⇧M";
+  if (!voice && !restoring) $("chatInput").focus();
+}
+
+function setupComposer() {
+  const modeToggle = $("modeToggle");
+  attachTooltip(modeToggle, () => modeToggle._tip || "Input mode", { delay: 350 });
   if (!SpeechRecognitionCls) {
-    document.body.classList.add("no-stt");
+    document.body.classList.add("no-stt"); // hides the toggle; keyboard only
     return;
   }
-  attachTooltip(micBtn, () => micBtn._tip || MIC_TITLE, { delay: 350 });
-  let recognition = null;
-  let recognizing = false;
+  const voiceBtn = $("voiceBtn");
+  attachTooltip(voiceBtn, () => voiceBtn._tip || "Tap to start, tap again to send", { delay: 350 });
 
-  function reset() {
-    recognizing = false;
-    micBtn.classList.remove("recording");
-    micBtn.textContent = "🎤";
-    micBtn.setAttribute("aria-pressed", "false");
-    micBtn._tip = null; // back to the default MIC_TITLE
+  let recognition = null, recognizing = false, finalText = "", aborted = false, blocked = false;
+
+  function setRecording(on) {
+    recognizing = on;
+    voiceBtn.classList.toggle("recording", on);
+    voiceBtn.setAttribute("aria-pressed", String(on));
+    voiceBtn.textContent = on ? VOICE_REC : VOICE_IDLE;
   }
 
   function start() {
-    if (recognizing) return;
+    if (recognizing || !canSend()) return; // don't record into a not-ready convo
     stopAudio(); // don't let the mic transcribe our own TTS
-    const input = $("chatInput");
-    const base = input.value.trim(); // dictation appends to anything already typed
-    let blocked = false;
+    finalText = ""; aborted = false; blocked = false;
     recognition = new SpeechRecognitionCls();
     recognition.lang = "es-ES";
+    recognition.continuous = true; // keep going through pauses (don't cut off mid-sentence)
     recognition.interimResults = true;
-    recognition.continuous = false;
     recognition.maxAlternatives = 1;
-    recognition.onstart = () => {
-      recognizing = true;
-      micBtn.classList.add("recording");
-      micBtn.textContent = "⏹";
-      micBtn.setAttribute("aria-pressed", "true");
-      micBtn._tip = "Stop listening";
-    };
+    recognition.onstart = () => setRecording(true);
     recognition.onresult = (e) => {
-      let transcript = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      input.value = base ? `${base} ${transcript}` : transcript;
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalText += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      voiceBtn.textContent = (finalText + interim).trim() || VOICE_REC;
     };
     recognition.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") blocked = true;
     };
     recognition.onend = () => {
-      reset(); // resets the tooltip; re-apply the blocked hint after, if needed
-      if (blocked) micBtn._tip = "Microphone blocked — allow mic access to dictate";
-      $("chatInput").focus();
+      setRecording(false);
+      voiceBtn._tip = blocked ? "Microphone blocked — allow mic access" : null;
+      const text = finalText.trim();
+      if (!aborted && text && canSend()) sendChatMessage(text); // auto-send on stop
     };
     try {
       recognition.start();
     } catch {
-      reset(); // start() throws if called while already active
+      setRecording(false); // start() throws if called while already active
     }
   }
 
-  stopVoiceInput = () => {
-    if (recognition && recognizing) recognition.stop();
+  function stop() {
+    if (recognition && recognizing) recognition.stop(); // → onend auto-sends
+  }
+
+  voiceBtn.addEventListener("click", () => (recognizing ? stop() : start()));
+
+  // Keyboard-shortcut hook (⌘⇧M): switch to voice if needed, then toggle.
+  startStopRecording = () => {
+    if (inputMode !== "voice") {
+      inputMode = "voice";
+      localStorage.setItem("inputMode", inputMode);
+      applyInputMode();
+    }
+    recognizing ? stop() : start();
   };
-  micBtn.addEventListener("click", () => (recognizing ? stopVoiceInput() : start()));
-  reset();
+
+  modeToggle.addEventListener("click", () => {
+    if (recognizing) {
+      aborted = true; // discard an in-progress recording when switching away
+      recognition.abort();
+    }
+    inputMode = inputMode === "voice" ? "keyboard" : "voice";
+    localStorage.setItem("inputMode", inputMode);
+    applyInputMode();
+  });
 }
-setupVoiceInput();
+setupComposer();
+applyInputMode();
 
 // ---- Input history (shell-style Up/Down recall) ----
 // Up fills the input with previous sent messages (useful for re-typing the
@@ -1262,10 +1304,9 @@ const resetTutorInputHistory = attachInputHistory($("tutorInput"), () =>
 
 $("chatForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  stopVoiceInput(); // end any in-progress dictation so it can't refill the input
   // Typing is always allowed; sending is gated. Bail (keeping the draft) if the
   // conversation isn't ready or a turn is still in flight.
-  if (!opening || $("chatForm").querySelector("button").disabled) return;
+  if (!canSend()) return;
   const text = $("chatInput").value.trim();
   if (!text) return;
   $("chatInput").value = "";

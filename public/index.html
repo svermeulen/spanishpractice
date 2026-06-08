@@ -154,9 +154,10 @@
       <section class="pane chat-pane">
         <div id="chatMessages" class="messages"></div>
         <form id="chatForm" class="input-row">
+          <button type="button" id="modeToggle" class="mode-toggle" aria-label="Switch to voice input">🎤</button>
           <input id="chatInput" type="text" placeholder="Escribe en espanol..." autocomplete="off" />
-          <button type="button" id="micBtn" class="mic-btn" aria-label="Speak in Spanish" aria-pressed="false">🎤</button>
-          <button type="submit">Send</button>
+          <button type="button" id="voiceBtn" class="voice-btn hidden" aria-pressed="false">🎤 Tap to talk</button>
+          <button type="submit" id="sendBtn">Send</button>
         </form>
       </section>
       <section class="pane tutor-pane">
