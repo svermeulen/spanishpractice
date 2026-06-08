@@ -490,7 +490,7 @@ const SCENARIO_SCHEMA = {
     image_prompt: {
       type: "string",
       description:
-        "A short third-person visual description of the physical SETTING only (the place, atmosphere, time of day) for a text-to-image generator to render as a background. No people, no dialogue, no second-person; e.g. \"A warm, bustling traditional tapas bar in Madrid at lunchtime, wooden bar, hanging hams, soft afternoon light.\"",
+        "A vivid, concrete third-person description of the physical SETTING for a text-to-image generator. Name the specific place, then 3–5 concrete visual details — architecture, key objects, materials, colours, lighting, time of day — so the image unmistakably depicts THIS location. Lead with the place. No people, no second-person, no dialogue, no text/signs. e.g. \"The interior of a traditional Madrid tapas bar at midday: a long zinc counter, cured hams hanging from the ceiling, blue-and-white tiled walls, wooden stools, warm afternoon light through a large window.\"",
     },
   },
   required: ["learner", "ai", "voice_gender", "image_prompt"],
@@ -507,10 +507,10 @@ function scenarioSystemPrompt(level = DEFAULT_LEVEL, region = DEFAULT_REGION, co
 - "learner": shown to the learner in a small header, so keep it SHORT — one concise sentence (roughly 8–16 words) naming the situation and the LEARNER's own role, addressed as "You". Do not describe the AI partner.
 - "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". This can be as long as is genuinely helpful (1–3 sentences). Match the complexity to the learner's level.
 - "voice_gender": "male" or "female" — the AI partner's gender, so a matching voice can be picked for audio.
-- "image_prompt": a short third-person description of the physical SETTING only (place, atmosphere, time of day) for a background image generator — no people, no second-person, no dialogue.
+- "image_prompt": a vivid, concrete description of the physical SETTING for a background image generator. Lead with the specific place, then 3–5 concrete visual details (architecture, key objects, materials, colours, lighting, time of day) grounded in ${reg.place}, so the image clearly depicts THIS location. No people, no second-person, no dialogue, no text/signs.
 
 Example:
-{"learner":"You're ordering lunch at a traditional restaurant and asking the waiter for a recommendation.","ai":"A traditional local restaurant. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male","image_prompt":"A warm, bustling traditional restaurant interior at lunchtime, wooden tables and soft daylight through tall windows."}${ctxBlock}`;
+{"learner":"You're ordering lunch at a traditional restaurant and asking the waiter for a recommendation.","ai":"A traditional local restaurant. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male","image_prompt":"The interior of a traditional ${reg.place} restaurant at midday: wooden tables with paper tablecloths, a tiled bar, bottles on shelves, framed photos on the walls, warm daylight through a large window."}${ctxBlock}`;
 }
 
 const SCENARIO_THEMES = [
@@ -914,7 +914,7 @@ function getImageStyleOptions() {
 // readable text (image models render garbled lettering that looks bad behind
 // real UI text).
 function buildImagePrompt(scene, style = DEFAULT_IMAGE_STYLE) {
-  return `A wide establishing shot of this setting: ${scene}. ${getImageStyle(style).prompt} No people in the foreground, and absolutely no readable text, words, letters, or signs. Composed to sit softly behind on-screen text.`;
+  return `A wide establishing shot in which the location itself is the subject — depict this specific setting faithfully and in detail: ${scene}. ${getImageStyle(style).prompt} No people in the foreground, and absolutely no readable text, words, letters, or signs. Composed to sit softly behind on-screen text.`;
 }
 
 // Dispatch to the selected backend → { blob, usage }. "none" never reaches here.
