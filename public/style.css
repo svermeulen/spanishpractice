@@ -342,6 +342,7 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
   display: flex;
   flex: 1;
   min-height: 0;
+  position: relative; /* anchors the dock-out reopen button */
 }
 .pane {
   display: flex;
@@ -349,8 +350,69 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
   min-height: 0;
   padding: 16px;
 }
-.chat-pane { flex: 3; border-right: 1px solid var(--border); }
-.tutor-pane { flex: 2; background: var(--pane-alt); }
+.chat-pane { flex: 1; min-width: 0; }
+.tutor-pane {
+  flex: 0 0 var(--tutor-width, 360px); /* resizable width; set by the divider drag */
+  min-width: 0;
+  background: var(--pane-alt);
+}
+
+/* Draggable divider between the panes */
+.pane-divider {
+  flex: 0 0 6px;
+  background: var(--border);
+  cursor: col-resize;
+  transition: background 0.15s ease;
+}
+.pane-divider:hover,
+body.resizing .pane-divider { background: var(--accent); }
+body.resizing { user-select: none; cursor: col-resize; }
+
+/* Tutor pane header (title + dock-out button) */
+.tutor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.tutor-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.pane-dock-btn {
+  padding: 2px 8px;
+  font-size: 14px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.pane-dock-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Floating button to dock the tutor back in when it's collapsed */
+.tutor-reopen {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--pane-bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.tutor-reopen:hover { border-color: var(--accent); color: var(--accent); }
 
 .messages {
   flex: 1;

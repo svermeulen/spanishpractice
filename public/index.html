@@ -160,13 +160,19 @@
           <button type="submit" id="sendBtn">Send</button>
         </form>
       </section>
-      <section class="pane tutor-pane">
+      <div id="paneDivider" class="pane-divider" role="separator" aria-orientation="vertical"></div>
+      <section class="pane tutor-pane" id="tutorPane">
+        <div class="tutor-head">
+          <span class="tutor-title">Tutor</span>
+          <button type="button" id="tutorDockBtn" class="pane-dock-btn" aria-label="Hide tutor panel">⟩</button>
+        </div>
         <div id="tutorMessages" class="messages"></div>
         <form id="tutorForm" class="input-row">
           <input id="tutorInput" type="text" placeholder="Why was my last message wrong?" autocomplete="off" />
           <button type="submit">Ask</button>
         </form>
       </section>
+      <button type="button" id="tutorReopen" class="tutor-reopen hidden" aria-label="Show tutor panel">💬 Tutor</button>
     </div>
   </div>
 

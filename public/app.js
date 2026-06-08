@@ -1262,6 +1262,58 @@ function setupComposer() {
 setupComposer();
 applyInputMode();
 
+// ---- Tutor pane: resize + dock in/out ----
+// Drag the divider to resize the tutor panel; the ⟩ button docks it out (chat
+// goes full-width, a floating "Tutor" button docks it back in). Both persist.
+const panesEl = document.querySelector(".panes");
+const tutorPaneEl = $("tutorPane");
+const paneDivider = $("paneDivider");
+const tutorReopenEl = $("tutorReopen");
+let tutorWidth = parseInt(localStorage.getItem("tutorWidth") || "360", 10);
+let tutorDocked = localStorage.getItem("tutorDocked") !== "out"; // docked in by default
+
+function applyTutorWidth() {
+  // Clamp so neither pane gets unusably small.
+  const maxW = Math.max(260, panesEl.clientWidth - 360);
+  const w = Math.max(260, Math.min(tutorWidth, maxW));
+  panesEl.style.setProperty("--tutor-width", w + "px");
+}
+function applyTutorDock() {
+  tutorPaneEl.classList.toggle("hidden", !tutorDocked);
+  paneDivider.classList.toggle("hidden", !tutorDocked);
+  tutorReopenEl.classList.toggle("hidden", tutorDocked);
+}
+function setTutorDocked(inDock) {
+  tutorDocked = inDock;
+  localStorage.setItem("tutorDocked", inDock ? "in" : "out");
+  applyTutorDock();
+}
+$("tutorDockBtn").addEventListener("click", () => setTutorDocked(false));
+tutorReopenEl.addEventListener("click", () => setTutorDocked(true));
+
+paneDivider.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  paneDivider.setPointerCapture(e.pointerId);
+  document.body.classList.add("resizing");
+  const onMove = (ev) => {
+    tutorWidth = panesEl.getBoundingClientRect().right - ev.clientX; // tutor is on the right
+    applyTutorWidth();
+  };
+  const onUp = () => {
+    paneDivider.releasePointerCapture(e.pointerId);
+    paneDivider.removeEventListener("pointermove", onMove);
+    paneDivider.removeEventListener("pointerup", onUp);
+    document.body.classList.remove("resizing");
+    const applied = parseInt(panesEl.style.getPropertyValue("--tutor-width"), 10);
+    if (applied) localStorage.setItem("tutorWidth", String(applied));
+  };
+  paneDivider.addEventListener("pointermove", onMove);
+  paneDivider.addEventListener("pointerup", onUp);
+});
+window.addEventListener("resize", applyTutorWidth);
+applyTutorWidth();
+applyTutorDock();
+
 // ---- Input history (shell-style Up/Down recall) ----
 // Up fills the input with previous sent messages (useful for re-typing the
 // corrected version of your last attempt); Down walks back toward your draft.
