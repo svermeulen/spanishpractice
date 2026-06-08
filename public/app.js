@@ -7,6 +7,9 @@ let autoPlayAudio = localStorage.getItem("autoPlayAudio") !== "false"; // on by 
 let checkAccents = localStorage.getItem("checkAccents") === "true"; // off by default (lenient)
 let model = localStorage.getItem("model") || ""; // "" = no model chosen yet
 let level = localStorage.getItem("level") || DEFAULT_LEVEL; // CEFR difficulty (A1–B2)
+let region = localStorage.getItem("region") || DEFAULT_REGION; // Spanish variety (dialect)
+let scenarioContext = localStorage.getItem("scenarioContext") || ""; // learner detail for scenario generation
+let customInstructions = localStorage.getItem("customInstructions") || ""; // free-text tone/behaviour tweak for the partner
 let voiceGender = null; // "male"|"female" from the scenario — matches the TTS voice
 let sessionCost = 0;
 let sessionTokens = { in: 0, out: 0 };
@@ -68,7 +71,7 @@ function normalizeSentence(s) {
   return (s || "").trim().split(/\s+/).map(normalizeWord).filter(Boolean).join(" ");
 }
 
-// `strict` (the "Correct accents & punctuation" setting): when true, accent-,
+// `strict` (the "Mark accents & punctuation as errors" setting): when true, accent-,
 // case-, and punctuation-only differences are shown as real corrections
 // (strikethrough/insertion) rather than forgiven/soft-highlighted. Word
 // alignment stays accent-insensitive either way, so "tu"→"tú" lines up as a
@@ -467,7 +470,7 @@ async function generateOpening() {
   const thinking = addThinking(chatMessagesEl);
   scrollToBottom(chatMessagesEl);
   try {
-    const turn = await apiOpening({ situation, model, level });
+    const turn = await apiOpening({ situation, model, level, region, custom: customInstructions });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
     trackUsage(turn.usage);
@@ -508,6 +511,8 @@ async function sendChatMessage(text, existingMsg = null) {
       model,
       strict: checkAccents,
       level,
+      region,
+      custom: customInstructions,
     });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
@@ -557,6 +562,7 @@ async function sendTutorQuestion(text, existingMsg = null) {
       transcript: transcript.join("\n"),
       model,
       level,
+      region,
     });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
@@ -669,7 +675,7 @@ async function startRandomSession() {
   syncSendButton(); // Send stays disabled until the opening is ready
   const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   try {
-    const sc = await apiScenario({ model, level });
+    const sc = await apiScenario({ model, level, region, context: scenarioContext });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     trackUsage(sc.usage);
     thinking.remove();
@@ -983,6 +989,32 @@ levelSelectEl.addEventListener("change", () => {
   level = levelSelectEl.value;
   localStorage.setItem("level", level);
 });
+
+// Spanish variety (regional dialect). Applies to subsequent turns and to the
+// next generated scenario; the current situation/conversation isn't rewritten.
+const regionSelectEl = $("regionSelect");
+if (!getRegionOptions().some((o) => o.value === region)) region = DEFAULT_REGION;
+fillSelect(regionSelectEl, getRegionOptions(), region);
+regionSelectEl.addEventListener("change", () => {
+  region = regionSelectEl.value;
+  localStorage.setItem("region", region);
+});
+
+// Free-text personalization: scenario context (woven into 🎲 generation) and
+// custom instructions (tone/behaviour of the conversation partner). Persisted on
+// input; trimmed so an all-whitespace value clears the stored key.
+function bindTextSetting(id, key, setter) {
+  const el = $(id);
+  el.value = localStorage.getItem(key) || "";
+  el.addEventListener("input", () => {
+    const v = el.value.trim();
+    setter(v);
+    if (v) localStorage.setItem(key, v);
+    else localStorage.removeItem(key);
+  });
+}
+bindTextSetting("scenarioContext", "scenarioContext", (v) => (scenarioContext = v));
+bindTextSetting("customInstructions", "customInstructions", (v) => (customInstructions = v));
 
 // ---- Appearance: color theme + light/dark ----
 // Two axes: a color theme (data-theme on <html>) and light/dark (the .dark

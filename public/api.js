@@ -276,22 +276,94 @@ function getLevelOptions() {
   return Object.entries(LEVELS).map(([value, l]) => ({ value, label: l.label }));
 }
 
+// ---- Spanish variety (regional dialect) ----
+// Which flavour of Spanish the partner speaks, the corrections push toward, and
+// the scenarios are set in. `spain` is the default (it's how the app shipped).
+// Each entry carries prompt fragments: `origin` (where the partner is from),
+// `name` (the variety's name), `place` (where scenarios are set), `features`
+// (vocab/grammar markers), `correction` (which cross-region forms to fix), and
+// `contrast` (the regional axis the tutor highlights).
+const REGIONS = {
+  spain: {
+    label: "Spain (Castilian)",
+    origin: "Spain",
+    name: "Castilian (Peninsular) Spanish",
+    place: "Spain",
+    features:
+      "vosotros for the informal plural you, Spain vocabulary and expressions (vale, coger, ordenador, móvil, zumo, patatas, conducir, echar de menos, etc.), and Spain usage generally",
+    correction:
+      "If the learner uses a Latin American form that differs in Spain (e.g. ustedes for informal plural, jugo, computadora, manejar), correct it to the Spain form and briefly explain the regional difference in notes.",
+    contrast: "Spain vs. Latin America",
+  },
+  latam: {
+    label: "Latin America (general)",
+    origin: "Latin America",
+    name: "neutral Latin American Spanish",
+    place: "Latin America",
+    features:
+      "ustedes for the plural you (never vosotros), widely-understood Latin American vocabulary (jugo, computadora, manejar, carro, celular, etc.), and a neutral pan–Latin American register",
+    correction:
+      "If the learner uses a distinctly Castilian/Spain form that differs across Latin America (e.g. vosotros, vale, coger in the Spain sense, ordenador, zumo), correct it to the Latin American form and briefly explain the regional difference in notes.",
+    contrast: "Latin America vs. Spain",
+  },
+  mexico: {
+    label: "Mexico",
+    origin: "Mexico",
+    name: "Mexican Spanish",
+    place: "Mexico",
+    features:
+      "ustedes for the plural you (never vosotros), Mexican vocabulary and expressions (¿mande?, ahorita, órale, chido, carro, computadora, jugo, platicar, etc.), and Mexican usage generally",
+    correction:
+      "If the learner uses a Spain form that differs in Mexico (e.g. vosotros, vale, coger in the Spain sense, ordenador, zumo, móvil), correct it to the Mexican form and briefly explain the regional difference in notes.",
+    contrast: "Mexico vs. Spain",
+  },
+  rioplatense: {
+    label: "Argentina / Uruguay (Rioplatense)",
+    origin: "Argentina",
+    name: "Rioplatense Spanish",
+    place: "Argentina",
+    features:
+      "voseo (vos instead of tú, with its present forms like vos tenés, vos podés, vos sos), ustedes for the plural you (never vosotros), Rioplatense vocabulary (che, dale, computadora, manejar, auto, palta, etc.), and Rioplatense usage generally",
+    correction:
+      "If the learner uses a tuteo or Spain form that differs in the Río de la Plata (e.g. tú tienes instead of vos tenés, vosotros, vale, coger in the Spain sense), correct it to the Rioplatense form and briefly explain the regional difference in notes.",
+    contrast: "the Río de la Plata vs. other regions",
+  },
+};
+
+const DEFAULT_REGION = "spain";
+
+// Resolve a stored region id to its definition, falling back to the default.
+function getRegion(id) {
+  return REGIONS[id] || REGIONS[DEFAULT_REGION];
+}
+
+// [{ value, label }] for building the Spanish-variety <select>.
+function getRegionOptions() {
+  return Object.entries(REGIONS).map(([value, r]) => ({ value, label: r.label }));
+}
+
 // ---- System prompts ----
 // `strict` toggles how accents/inverted punctuation are judged (see the
-// "Correct accents & punctuation" setting). Either way corrected_message is
+// "Mark accents & punctuation as errors" setting). Either way corrected_message is
 // always written with proper accents; strict only decides whether the learner's
 // omissions count as mistakes (tagged / noted) or are silently fixed.
 // `level` (CEFR id) scales the partner's speech and the feedback depth.
-function chatSystemPrompt(situation, strict = false, level = DEFAULT_LEVEL) {
+// `region` (variety id) sets the dialect; `custom` is the learner's free-text
+// personalization (tone, constraints), appended verbatim when non-empty.
+function chatSystemPrompt(situation, strict = false, level = DEFAULT_LEVEL, region = DEFAULT_REGION, custom = "") {
   const lvl = getLevel(level);
+  const reg = getRegion(region);
   const accentPolicy = strict
     ? `Treat missing or incorrect accents/tildes, missing ¿/¡, and missing capitalization at the start of sentences as mistakes: fix them in the corrected version, and you may note the meaning-changing ones (e.g. sí vs si, tú vs tu) and tag them (accent, punctuation, capitalization). Don't belabor every trivial accent in notes — focus on what's most useful.`
     : `The learner has not set up their keyboard for Spanish accents or inverted punctuation, so never treat missing accents, missing tildes, missing ¿/¡, or missing capitalization at the start of sentences as mistakes. Always write the corrected version with proper accents and punctuation, but don't flag, tag, or comment on the learner's omissions of them.`;
-  return `You are a friendly native Spanish speaker from Spain helping an English-speaking learner practice Spanish through roleplay. The learner is moving to Spain, so always use Castilian (Peninsular) Spanish: vosotros for informal plural you, Spain vocabulary and expressions (vale, coger, ordenador, movil, zumo, patatas, conducir, echar de menos, etc.), and Spain usage generally.
+  const customBlock = custom.trim()
+    ? `\n\nThe learner has added these personal instructions for how you should behave — follow them as long as they don't conflict with the above: ${custom.trim()}`
+    : "";
+  return `You are a friendly native Spanish speaker from ${reg.origin} helping an English-speaking learner practice Spanish through roleplay. Always use ${reg.name}: ${reg.features}.
 
 The learner is at CEFR level ${level}. Pitch the conversation to that level: ${lvl.reply}. Naturally include a question in each reply to keep the conversation going.
 
-When correcting, prefer how it would naturally be said in Spain. If the learner uses a Latin American form that differs in Spain (e.g. ustedes for informal plural, jugo, computadora, manejar), correct it to the Spain form and briefly explain the regional difference in notes. ${lvl.correction}
+When correcting, prefer how it would naturally be said in ${reg.place}. ${reg.correction} ${lvl.correction}
 
 Roleplay situation: ${situation}
 
@@ -301,11 +373,12 @@ ${accentPolicy}
 
 The learner sees the before/after correction and the natural version on their own, so don't waste the notes field restating them. Use notes only to add something they can't already see: the rule or reason behind a fix so they can apply it next time, a quick tip, a common pitfall, or a usage nuance. If there's nothing worth adding, leave notes empty rather than narrating the obvious.
 
-For every learner message, produce the structured turn data: your interpretation of their intent, the corrected version of their message (close to their attempt, errors fixed), the natural version (only when a native would phrase it noticeably differently), notes (only genuinely new teaching value — see above), mistake category tags, and your in-character reply with its English translation.`;
+For every learner message, produce the structured turn data: your interpretation of their intent, the corrected version of their message (close to their attempt, errors fixed), the natural version (only when a native would phrase it noticeably differently), notes (only genuinely new teaching value — see above), mistake category tags, and your in-character reply with its English translation.${customBlock}`;
 }
 
-function tutorSystemPrompt(transcript, level = DEFAULT_LEVEL) {
-  return `You are a patient, expert Spanish tutor answering questions from an English-speaking learner (CEFR level ${level}) who is moving to Spain. Pitch your explanations to that level — simpler and more concrete for A1/A2, more detailed and nuanced for B1/B2. Teach Castilian (Peninsular) Spanish: default to Spain vocabulary, usage, and the vosotros forms, and point out Spain-vs-Latin-America differences when they're relevant to the question. Answer in English, concisely and clearly, with short Spanish examples where helpful. Plain text only — no markdown headings or bullets unless genuinely useful.
+function tutorSystemPrompt(transcript, level = DEFAULT_LEVEL, region = DEFAULT_REGION) {
+  const reg = getRegion(region);
+  return `You are a patient, expert Spanish tutor answering questions from an English-speaking learner (CEFR level ${level}). Pitch your explanations to that level — simpler and more concrete for A1/A2, more detailed and nuanced for B1/B2. Teach ${reg.name}: default to ${reg.place} vocabulary and usage, and point out ${reg.contrast} differences when they're relevant to the question. Answer in English, concisely and clearly, with short Spanish examples where helpful. Plain text only — no markdown headings or bullets unless genuinely useful.
 
 The learner is currently having a Spanish practice conversation. Here is the transcript so far, so you can answer questions about it ("why was my last message wrong?", etc.):
 
@@ -343,10 +416,10 @@ function parseStructured(text) {
   }
 }
 
-async function apiChat({ situation, history = [], message, model, strict = false, level = DEFAULT_LEVEL }) {
+async function apiChat({ situation, history = [], message, model, strict = false, level = DEFAULT_LEVEL, region = DEFAULT_REGION, custom = "" }) {
   const { text, usage } = await complete({
     model,
-    system: chatSystemPrompt(situation, strict, level),
+    system: chatSystemPrompt(situation, strict, level, region, custom),
     messages: [...history, { role: "user", content: message }],
     schema: TURN_SCHEMA,
     maxTokens: 16000,
@@ -368,10 +441,10 @@ async function apiChat({ situation, history = [], message, model, strict = false
   return { ...turn, usage };
 }
 
-async function apiOpening({ situation, model, level = DEFAULT_LEVEL }) {
+async function apiOpening({ situation, model, level = DEFAULT_LEVEL, region = DEFAULT_REGION, custom = "" }) {
   const { text, usage } = await complete({
     model,
-    system: chatSystemPrompt(situation, false, level),
+    system: chatSystemPrompt(situation, false, level, region, custom),
     messages: [{ role: "user", content: OPENING_INSTRUCTION }],
     schema: OPENING_SCHEMA,
     maxTokens: 6000,
@@ -382,10 +455,10 @@ async function apiOpening({ situation, model, level = DEFAULT_LEVEL }) {
   return { ...turn, usage };
 }
 
-async function apiTutor({ history = [], question, transcript = "", model, level = DEFAULT_LEVEL }) {
+async function apiTutor({ history = [], question, transcript = "", model, level = DEFAULT_LEVEL, region = DEFAULT_REGION }) {
   const { text, usage } = await complete({
     model,
-    system: tutorSystemPrompt(transcript, level),
+    system: tutorSystemPrompt(transcript, level, region),
     messages: [...history, { role: "user", content: question }],
     maxTokens: 16000,
   });
@@ -419,35 +492,39 @@ const SCENARIO_SCHEMA = {
   additionalProperties: false,
 };
 
-function scenarioSystemPrompt(level = DEFAULT_LEVEL) {
+function scenarioSystemPrompt(level = DEFAULT_LEVEL, region = DEFAULT_REGION, context = "") {
   const lvl = getLevel(level);
-  return `You generate a single roleplay scenario for an English speaker practicing Spanish who is moving to Spain. Set it in Spain (vary the cities and regions) and assume Castilian Spanish. The learner is at CEFR level ${level}, so make it ${lvl.scenario}. Return these fields in English:
+  const reg = getRegion(region);
+  const ctxBlock = context.trim()
+    ? `\n\nWeave in this learner-provided context when it fits the scenario naturally — don't force it: ${context.trim()}`
+    : "";
+  return `You generate a single roleplay scenario for an English speaker practicing Spanish. Set it in ${reg.place} (vary the cities and regions) and assume ${reg.name}. The learner is at CEFR level ${level}, so make it ${lvl.scenario}. Return these fields in English:
 - "learner": shown to the learner in a small header, so keep it SHORT — one concise sentence (roughly 8–16 words) naming the situation and the LEARNER's own role, addressed as "You". Do not describe the AI partner.
 - "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". This can be as long as is genuinely helpful (1–3 sentences). Match the complexity to the learner's level.
 - "voice_gender": "male" or "female" — the AI partner's gender, so a matching voice can be picked for audio.
 
 Example:
-{"learner":"You're ordering lunch at a traditional restaurant in Madrid and asking the waiter for a recommendation.","ai":"A traditional restaurant in Madrid. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male"}`;
+{"learner":"You're ordering lunch at a traditional restaurant and asking the waiter for a recommendation.","ai":"A traditional local restaurant. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male"}${ctxBlock}`;
 }
 
 const SCENARIO_THEMES = [
   "ordering at a restaurant, bar, or café",
   "shopping — market, bakery, pharmacy, phone shop, or clothes",
   "public transport, a taxi, or asking for directions",
-  "housing & bureaucracy — renting, the NIE, the ayuntamiento, or the bank",
+  "housing & bureaucracy — renting, residency paperwork, the town hall, or the bank",
   "the doctor, dentist, hairdresser, or gym",
   "meeting neighbours or friends of friends; small talk",
   "weekend plans, hobbies, the weather, or football",
-  "a local festival — San Fermín, Las Fallas, Semana Santa, a verbena",
+  "a local festival or public holiday",
   "a family gathering or a meal at someone's home",
-  "something creative and a bit playful — a lost dog in the park, a cooking class going slightly wrong, a chatty taxi driver who used to be a bullfighter, a flamenco class, finding a wallet, a game-show contestant",
+  "something creative and a bit playful — a lost dog in the park, a cooking class going slightly wrong, a chatty taxi driver with a colourful past, a dance class, finding a wallet, a game-show contestant",
 ];
 
-async function apiScenario({ model, level = DEFAULT_LEVEL }) {
+async function apiScenario({ model, level = DEFAULT_LEVEL, region = DEFAULT_REGION, context = "" }) {
   const theme = SCENARIO_THEMES[Math.floor(Math.random() * SCENARIO_THEMES.length)];
   const { text, usage } = await complete({
     model,
-    system: scenarioSystemPrompt(level),
+    system: scenarioSystemPrompt(level, region, context),
     messages: [
       {
         role: "user",

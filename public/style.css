@@ -271,6 +271,7 @@ header {
   box-sizing: border-box;
 }
 .setting-input:focus { outline: none; border-color: var(--accent); }
+textarea.setting-input { resize: vertical; min-height: 42px; line-height: 1.4; }
 .settings-note {
   font-size: 11px;
   line-height: 1.45;

@@ -69,6 +69,10 @@
                   <span>Level</span>
                   <select id="levelSelect"></select>
                 </label>
+                <label class="setting setting-row">
+                  <span>Spanish variety</span>
+                  <select id="regionSelect"></select>
+                </label>
 
                 <h3 class="settings-section">Appearance</h3>
                 <label class="setting setting-row">
@@ -90,10 +94,22 @@
                   <kbd class="setting-key">⌘I</kbd>
                 </label>
                 <label class="setting setting-row">
-                  <span><input type="checkbox" id="checkAccents" /> Correct accents &amp; punctuation</span>
+                  <span><input type="checkbox" id="checkAccents" /> Mark accents &amp; punctuation as errors</span>
                 </label>
                 <label class="setting setting-row">
                   <span><input type="checkbox" id="showCost" /> Show session cost</span>
+                </label>
+
+                <h3 class="settings-section">Personalization</h3>
+                <label class="setting setting-col">
+                  <span>Scenario context <span class="setting-hint">(optional)</span></span>
+                  <textarea id="scenarioContext" class="setting-input" rows="2" autocomplete="off" spellcheck="false" placeholder="e.g. I'm a nurse living in Valencia — lean toward work and daily-life situations"></textarea>
+                  <p class="settings-note">Extra detail woven into generated situations. Applies to the next 🎲 / new situation.</p>
+                </label>
+                <label class="setting setting-col">
+                  <span>Custom instructions <span class="setting-hint">(optional)</span></span>
+                  <textarea id="customInstructions" class="setting-input" rows="2" autocomplete="off" spellcheck="false" placeholder="e.g. Speak warmly and patiently; keep your replies a little shorter"></textarea>
+                  <p class="settings-note">Tweaks how your conversation partner behaves (tone, length, etc.). Applies to subsequent turns.</p>
                 </label>
               </div>
 

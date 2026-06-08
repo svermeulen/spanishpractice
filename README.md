@@ -12,7 +12,8 @@ provider you choose. Nothing is logged or proxied.
 ## Features
 
 - **Roleplay chat** — the AI plays a scenario partner (waiter, shopkeeper, new
-  neighbour, ...) and keeps the conversation going in simple Castilian Spanish.
+  neighbour, ...) and keeps the conversation going in the Spanish variety you
+  pick (Spain / Mexico / general Latin America / Rioplatense).
 - **Inline corrections** — your message is diffed word-by-word against a native
   rewrite: real fixes show as strikethrough/insertion, accent-only differences
   are softly highlighted (a missing accent isn't treated as an error), and a
@@ -29,7 +30,10 @@ provider you choose. Nothing is logged or proxied.
   transcribes and sends automatically (`⌘⇧M` toggles recording).
 - **Gentle on accents** — missing accents (á, ñ) and inverted punctuation
   (¿ ¡) are forgiven by default (your keyboard may not have them); flip on
-  "Correct accents & punctuation" in Settings to have them checked too.
+  "Mark accents & punctuation as errors" in Settings to have them checked too.
+- **Make it yours** — pick a Spanish variety (Spain / Mexico / Latin America /
+  Rioplatense), and optionally add scenario context (your job, city, interests)
+  and custom instructions for the partner's tone — all in Settings → General.
 - **Fresh scenarios** — every conversation starts from an AI-generated
   situation; 🎲 (or ⌘K) rolls a new one, ✎ lets you type your own, and 🤖
   previews the hidden AI-facing prompt.
