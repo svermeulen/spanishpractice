@@ -1273,6 +1273,22 @@ imageBackendSelectEl.addEventListener("change", () => {
 });
 applyImageState();
 
+// Scene-background blur amount (px). Drives the --scene-blur CSS var live as the
+// slider drags; persisted so the backdrop reads the same on reload.
+let sceneBlur = parseInt(localStorage.getItem("sceneBlur") ?? "3", 10);
+if (!Number.isFinite(sceneBlur)) sceneBlur = 3;
+function applySceneBlur() {
+  document.documentElement.style.setProperty("--scene-blur", `${sceneBlur}px`);
+}
+const sceneBlurEl = $("sceneBlur");
+sceneBlurEl.value = String(sceneBlur);
+sceneBlurEl.addEventListener("input", () => {
+  sceneBlur = parseInt(sceneBlurEl.value, 10) || 0;
+  localStorage.setItem("sceneBlur", String(sceneBlur));
+  applySceneBlur();
+});
+applySceneBlur();
+
 // Strict accent/punctuation checking. Applies to subsequent messages — past
 // corrections were generated (and diffed) under the previous policy, so they're
 // left as-is rather than retroactively re-judged.

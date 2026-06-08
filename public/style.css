@@ -104,8 +104,8 @@ button { font-family: inherit; }
   z-index: -1; /* above the page canvas, below all in-flow content */
   background-size: cover;
   background-position: center;
-  filter: blur(3px);
-  transform: scale(1.06); /* hide the soft blurred edges */
+  filter: blur(var(--scene-blur, 3px));
+  transform: scale(1.08); /* slight overscan to hide the soft blurred edges */
   opacity: 0;
   transition: opacity 0.8s ease;
   pointer-events: none;

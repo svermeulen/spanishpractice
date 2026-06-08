@@ -178,6 +178,10 @@
                   <span>Scene background</span>
                   <select id="imageBackendSelect"></select>
                 </label>
+                <label class="setting setting-row">
+                  <span>Background blur</span>
+                  <input type="range" id="sceneBlur" min="0" max="24" step="1" />
+                </label>
                 <p class="settings-note" id="imageBackendNote"></p>
                 <p class="settings-note">Generates one blurred image of the situation behind the chat, refreshed when you start a new situation (🎲) — not every message, to keep cost low. Reuses your OpenAI / Gemini key. Roughly $0.005 (OpenAI) – $0.02 (Gemini) per situation; tracked in the cost ticker.</p>
               </div>
