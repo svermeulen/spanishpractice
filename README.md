@@ -32,6 +32,9 @@ provider you choose. Nothing is logged or proxied.
 - **Fresh scenarios** — every conversation starts from an AI-generated
   situation; 🎲 (or ⌘K) rolls a new one, ✎ lets you type your own, and 🤖
   previews the hidden AI-facing prompt.
+- **Difficulty levels** — pick your CEFR level (A1–B2) in onboarding or
+  Settings; it scales how the partner speaks, how complex the scenarios are,
+  and how thorough the corrections get.
 - **Session cost ticker** — live token cost estimate per provider.
 
 ## Providers

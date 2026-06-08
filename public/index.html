@@ -40,6 +40,10 @@
               <span>Model</span>
               <select id="modelSelect"></select>
             </label>
+            <label class="setting setting-row">
+              <span>Level</span>
+              <select id="levelSelect"></select>
+            </label>
             <label class="setting setting-col" id="set-anthropic">
               <span>Anthropic API key</span>
               <input type="password" id="anthropicKey" class="setting-input" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
@@ -125,6 +129,10 @@
         <select id="onbProvider"></select>
       </label>
       <div id="onbFields"></div>
+      <label class="onb-field">
+        <span>Your Spanish level</span>
+        <select id="onbLevel"></select>
+      </label>
       <button id="onbStart" class="onb-start" type="button" disabled>Start practicing</button>
       <p class="onb-fine">Tip: create a key with a spending limit. You can change provider, model, or keys anytime in ⚙ Settings.</p>
     </div>

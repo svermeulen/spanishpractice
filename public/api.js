@@ -219,30 +219,91 @@ const OPENING_SCHEMA = {
   additionalProperties: false,
 };
 
+// ---- Difficulty levels (CEFR A1–B2) ----
+// One registry, three prompt fragments per level: `reply` shapes how the AI
+// partner speaks, `scenario` how complex a generated situation is, `correction`
+// how strict/deep the feedback is. Injected into the prompts below; the bare
+// CEFR label is also named so the model leans on its own CEFR prior. Ordered
+// easiest-first. Tune the calibration here — it's the only place it lives.
+const LEVELS = {
+  A1: {
+    label: "A1 · Beginner",
+    reply:
+      "one short sentence (occasionally two), only high-frequency everyday vocabulary, and the present tense almost exclusively. No idioms or complex grammar",
+    scenario:
+      "a simple, concrete, transactional situation (ordering, greetings, basic shopping, asking directions) with a single clear goal",
+    correction:
+      "Correct only the most important errors that block meaning. Keep notes very brief and encouraging; don't overwhelm the beginner with minor nuance.",
+  },
+  A2: {
+    label: "A2 · Elementary",
+    reply:
+      "one or two short, simple sentences using everyday vocabulary; you may use the past and near-future tenses. Keep idioms rare and obvious",
+    scenario:
+      "an everyday situation with a little more detail (making plans, a short errand with a small complication, simple small talk)",
+    correction:
+      "Correct the main grammar and vocabulary errors. Keep notes short and encouraging, with the occasional useful tip.",
+  },
+  B1: {
+    label: "B1 · Intermediate",
+    reply:
+      "two or three natural but clear sentences at a conversational pace, using a normal range of tenses (including past, future, conditional), common connectors, and some common idioms",
+    scenario:
+      "a richer everyday or mildly unexpected situation (resolving a misunderstanding, giving opinions on plans, sorting out a minor problem)",
+    correction:
+      "Correct grammar, vocabulary, and word choice, and point out phrasing that sounds unnatural. Notes can be a bit more detailed.",
+  },
+  B2: {
+    label: "B2 · Upper-intermediate",
+    reply:
+      "two to four sentences at a natural pace, close to how you'd speak with a native — the full range of tenses (including the subjunctive), idioms, and colloquial Spain expressions",
+    scenario:
+      "a complex or abstract situation (making a complaint, negotiating, defending an opinion, an interview, a nuanced social moment)",
+    correction:
+      "Correct subtle issues too — register, idiom, naturalness, and nuance — not just outright errors. Notes can be detailed and address style.",
+  },
+};
+
+const DEFAULT_LEVEL = "A1";
+
+// Resolve a stored level id to its definition, falling back to the default.
+function getLevel(id) {
+  return LEVELS[id] || LEVELS[DEFAULT_LEVEL];
+}
+
+// [{ value, label }] for building the level <select> (easiest-first).
+function getLevelOptions() {
+  return Object.entries(LEVELS).map(([value, l]) => ({ value, label: l.label }));
+}
+
 // ---- System prompts ----
 // `strict` toggles how accents/inverted punctuation are judged (see the
 // "Correct accents & punctuation" setting). Either way corrected_message is
 // always written with proper accents; strict only decides whether the learner's
 // omissions count as mistakes (tagged / noted) or are silently fixed.
-function chatSystemPrompt(situation, strict = false) {
+// `level` (CEFR id) scales the partner's speech and the feedback depth.
+function chatSystemPrompt(situation, strict = false, level = DEFAULT_LEVEL) {
+  const lvl = getLevel(level);
   const accentPolicy = strict
     ? `Treat missing or incorrect accents/tildes, missing ¿/¡, and missing capitalization at the start of sentences as mistakes: fix them in the corrected version, and you may note the meaning-changing ones (e.g. sí vs si, tú vs tu) and tag them (accent, punctuation, capitalization). Don't belabor every trivial accent in notes — focus on what's most useful.`
     : `The learner has not set up their keyboard for Spanish accents or inverted punctuation, so never treat missing accents, missing tildes, missing ¿/¡, or missing capitalization at the start of sentences as mistakes. Always write the corrected version with proper accents and punctuation, but don't flag, tag, or comment on the learner's omissions of them.`;
-  return `You are a friendly native Spanish speaker from Spain helping an English-speaking beginner practice Spanish through roleplay. The learner is moving to Spain, so always use Castilian (Peninsular) Spanish: vosotros for informal plural you, Spain vocabulary and expressions (vale, coger, ordenador, movil, zumo, patatas, conducir, echar de menos, etc.), and Spain usage generally.
+  return `You are a friendly native Spanish speaker from Spain helping an English-speaking learner practice Spanish through roleplay. The learner is moving to Spain, so always use Castilian (Peninsular) Spanish: vosotros for informal plural you, Spain vocabulary and expressions (vale, coger, ordenador, movil, zumo, patatas, conducir, echar de menos, etc.), and Spain usage generally.
 
-When correcting, prefer how it would naturally be said in Spain. If the learner uses a Latin American form that differs in Spain (e.g. ustedes for informal plural, jugo, computadora, manejar), correct it to the Spain form and briefly explain the regional difference in notes.
+The learner is at CEFR level ${level}. Pitch the conversation to that level: ${lvl.reply}. Naturally include a question in each reply to keep the conversation going.
+
+When correcting, prefer how it would naturally be said in Spain. If the learner uses a Latin American form that differs in Spain (e.g. ustedes for informal plural, jugo, computadora, manejar), correct it to the Spain form and briefly explain the regional difference in notes. ${lvl.correction}
 
 Roleplay situation: ${situation}
 
-Stay in character as a person who makes sense in this situation. Keep your replies very short and simple (1-2 sentences, beginner-friendly vocabulary) so the learner is likely to understand, and naturally include a question in each reply to keep the conversation going.
+Stay in character as a person who makes sense in this situation.
 
 ${accentPolicy}
 
 For every learner message, produce the structured turn data: your interpretation of their intent, the corrected version of their message (close to their attempt, errors fixed), the natural version (only when a native would phrase it noticeably differently), correction notes, mistake category tags, and your in-character reply with its English translation.`;
 }
 
-function tutorSystemPrompt(transcript) {
-  return `You are a patient, expert Spanish tutor answering questions from an English-speaking beginner who is moving to Spain. Teach Castilian (Peninsular) Spanish: default to Spain vocabulary, usage, and the vosotros forms, and point out Spain-vs-Latin-America differences when they're relevant to the question. Answer in English, concisely and clearly, with short Spanish examples where helpful. Plain text only — no markdown headings or bullets unless genuinely useful.
+function tutorSystemPrompt(transcript, level = DEFAULT_LEVEL) {
+  return `You are a patient, expert Spanish tutor answering questions from an English-speaking learner (CEFR level ${level}) who is moving to Spain. Pitch your explanations to that level — simpler and more concrete for A1/A2, more detailed and nuanced for B1/B2. Teach Castilian (Peninsular) Spanish: default to Spain vocabulary, usage, and the vosotros forms, and point out Spain-vs-Latin-America differences when they're relevant to the question. Answer in English, concisely and clearly, with short Spanish examples where helpful. Plain text only — no markdown headings or bullets unless genuinely useful.
 
 The learner is currently having a Spanish practice conversation. Here is the transcript so far, so you can answer questions about it ("why was my last message wrong?", etc.):
 
@@ -280,10 +341,10 @@ function parseStructured(text) {
   }
 }
 
-async function apiChat({ situation, history = [], message, model, strict = false }) {
+async function apiChat({ situation, history = [], message, model, strict = false, level = DEFAULT_LEVEL }) {
   const { text, usage } = await complete({
     model,
-    system: chatSystemPrompt(situation, strict),
+    system: chatSystemPrompt(situation, strict, level),
     messages: [...history, { role: "user", content: message }],
     schema: TURN_SCHEMA,
     maxTokens: 16000,
@@ -305,10 +366,10 @@ async function apiChat({ situation, history = [], message, model, strict = false
   return { ...turn, usage };
 }
 
-async function apiOpening({ situation, model }) {
+async function apiOpening({ situation, model, level = DEFAULT_LEVEL }) {
   const { text, usage } = await complete({
     model,
-    system: chatSystemPrompt(situation),
+    system: chatSystemPrompt(situation, false, level),
     messages: [{ role: "user", content: OPENING_INSTRUCTION }],
     schema: OPENING_SCHEMA,
     maxTokens: 6000,
@@ -319,10 +380,10 @@ async function apiOpening({ situation, model }) {
   return { ...turn, usage };
 }
 
-async function apiTutor({ history = [], question, transcript = "", model }) {
+async function apiTutor({ history = [], question, transcript = "", model, level = DEFAULT_LEVEL }) {
   const { text, usage } = await complete({
     model,
-    system: tutorSystemPrompt(transcript),
+    system: tutorSystemPrompt(transcript, level),
     messages: [...history, { role: "user", content: question }],
     maxTokens: 16000,
   });
@@ -356,13 +417,16 @@ const SCENARIO_SCHEMA = {
   additionalProperties: false,
 };
 
-const SCENARIO_SYSTEM = `You generate a single roleplay scenario for an English speaker practicing beginner Spanish who is moving to Spain. Set it in Spain (vary the cities and regions) and assume Castilian Spanish. Return two fields, both 1-2 sentences in English:
+function scenarioSystemPrompt(level = DEFAULT_LEVEL) {
+  const lvl = getLevel(level);
+  return `You generate a single roleplay scenario for an English speaker practicing Spanish who is moving to Spain. Set it in Spain (vary the cities and regions) and assume Castilian Spanish. The learner is at CEFR level ${level}, so make it ${lvl.scenario}. Return two fields, both 1-2 sentences in English:
 - "learner": shown to the learner — the situation and the LEARNER's own role, addressed as "You". Do not describe the AI partner.
-- "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". Keep it simple enough for a beginner to navigate.
+- "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". Match the complexity to the learner's level.
 - "voice_gender": "male" or "female" — the AI partner's gender, so a matching voice can be picked for audio.
 
 Example:
 {"learner":"You're ordering lunch at a traditional restaurant in Madrid and asking the waiter for a recommendation.","ai":"A traditional restaurant in Madrid. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male"}`;
+}
 
 const SCENARIO_THEMES = [
   "ordering at a restaurant, bar, or café",
@@ -374,14 +438,14 @@ const SCENARIO_THEMES = [
   "weekend plans, hobbies, the weather, or football",
   "a local festival — San Fermín, Las Fallas, Semana Santa, a verbena",
   "a family gathering or a meal at someone's home",
-  "something creative but beginner-friendly — a lost dog in the park, a cooking class going slightly wrong, a chatty taxi driver who used to be a bullfighter, a flamenco class, finding a wallet, a game-show contestant",
+  "something creative and a bit playful — a lost dog in the park, a cooking class going slightly wrong, a chatty taxi driver who used to be a bullfighter, a flamenco class, finding a wallet, a game-show contestant",
 ];
 
-async function apiScenario({ model }) {
+async function apiScenario({ model, level = DEFAULT_LEVEL }) {
   const theme = SCENARIO_THEMES[Math.floor(Math.random() * SCENARIO_THEMES.length)];
   const { text, usage } = await complete({
     model,
-    system: SCENARIO_SYSTEM,
+    system: scenarioSystemPrompt(level),
     messages: [
       {
         role: "user",

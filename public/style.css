@@ -566,7 +566,8 @@ body.no-tts .tts-only { display: none; }
   color: var(--muted);
 }
 .onb-input,
-#onbProvider {
+#onbProvider,
+#onbLevel {
   font-family: inherit;
   font-size: 14px;
   color: var(--text);
@@ -578,7 +579,8 @@ body.no-tts .tts-only { display: none; }
   box-sizing: border-box;
 }
 .onb-input:focus,
-#onbProvider:focus {
+#onbProvider:focus,
+#onbLevel:focus {
   outline: none;
   border-color: var(--accent);
 }

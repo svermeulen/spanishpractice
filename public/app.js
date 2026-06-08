@@ -6,6 +6,7 @@ let showCost = localStorage.getItem("showCost") !== "false"; // shown by default
 let autoPlayAudio = localStorage.getItem("autoPlayAudio") !== "false"; // on by default
 let checkAccents = localStorage.getItem("checkAccents") === "true"; // off by default (lenient)
 let model = localStorage.getItem("model") || ""; // "" = no model chosen yet
+let level = localStorage.getItem("level") || DEFAULT_LEVEL; // CEFR difficulty (A1–B2)
 let voiceGender = null; // "male"|"female" from the scenario — matches the TTS voice
 let sessionCost = 0;
 let sessionTokens = { in: 0, out: 0 };
@@ -442,7 +443,7 @@ async function generateOpening() {
   const thinking = addThinking(chatMessagesEl);
   scrollToBottom(chatMessagesEl);
   try {
-    const turn = await apiOpening({ situation, model });
+    const turn = await apiOpening({ situation, model, level });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
     trackUsage(turn.usage);
@@ -485,6 +486,7 @@ async function sendChatMessage(text, existingMsg = null) {
       message: text,
       model,
       strict: checkAccents,
+      level,
     });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
@@ -533,6 +535,7 @@ async function sendTutorQuestion(text, existingMsg = null) {
       question: text,
       transcript: transcript.join("\n"),
       model,
+      level,
     });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
@@ -649,7 +652,7 @@ async function startRandomSession() {
   scenarioInFlight = true;
   const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   try {
-    const sc = await apiScenario({ model });
+    const sc = await apiScenario({ model, level });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     trackUsage(sc.usage);
     thinking.remove();
@@ -870,6 +873,21 @@ modelSelectEl.addEventListener("change", () => {
   maybeResumeOpening();
 });
 
+// Difficulty level select (CEFR A1–B2). Applies to subsequent turns — the
+// current scenario stays; replies/corrections recalibrate going forward.
+const levelSelectEl = $("levelSelect");
+for (const opt of getLevelOptions()) {
+  const o = document.createElement("option");
+  o.value = opt.value;
+  o.textContent = opt.label;
+  levelSelectEl.appendChild(o);
+}
+levelSelectEl.value = level;
+levelSelectEl.addEventListener("change", () => {
+  level = levelSelectEl.value;
+  localStorage.setItem("level", level);
+});
+
 const autoShowEnEl = $("autoShowEn");
 autoShowEnEl.checked = autoShowEn;
 autoShowEnEl.addEventListener("change", () => {
@@ -1086,6 +1104,7 @@ const ONB_PROVIDERS = [
 const onbOverlay = $("onboarding");
 const onbProviderEl = $("onbProvider");
 const onbFieldsEl = $("onbFields");
+const onbLevelEl = $("onbLevel");
 const onbStartEl = $("onbStart");
 
 for (const p of ONB_PROVIDERS) {
@@ -1094,6 +1113,13 @@ for (const p of ONB_PROVIDERS) {
   o.textContent = p.label;
   onbProviderEl.appendChild(o);
 }
+for (const opt of getLevelOptions()) {
+  const o = document.createElement("option");
+  o.value = opt.value;
+  o.textContent = opt.label;
+  onbLevelEl.appendChild(o);
+}
+onbLevelEl.value = level;
 
 function setStored(k, v) {
   const t = (v || "").trim();
@@ -1164,6 +1190,7 @@ onbProviderEl.addEventListener("change", () => renderOnbFields(onbProviderEl.val
 function showOnboarding() {
   const pid = model && resolveModel(model).providerId;
   onbProviderEl.value = ONB_PROVIDERS.some((p) => p.id === pid) ? pid : "anthropic";
+  onbLevelEl.value = level;
   renderOnbFields(onbProviderEl.value);
   onbOverlay.classList.remove("hidden");
 }
@@ -1184,6 +1211,9 @@ function startFromOnboarding() {
   model = firstModelForProvider(pid);
   localStorage.setItem("model", model);
   modelSelectEl.value = model;
+  level = onbLevelEl.value;
+  localStorage.setItem("level", level);
+  levelSelectEl.value = level;
   syncSettingsInputs();
   applyProviderVisibility();
   applyTtsVisibility();
