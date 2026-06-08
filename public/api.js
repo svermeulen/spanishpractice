@@ -618,76 +618,156 @@ function toGeminiSchema(s) {
   return out;
 }
 
-// ---- Text-to-speech (ElevenLabs, direct browser call) ----
-const TTS_MODEL = "eleven_multilingual_v2";
+// ---- Text-to-speech ----
+// Multiple backends, chosen explicitly in Audio settings (`ttsBackend`): the free
+// browser speech synthesis (handled in app.js), or a cloud provider here —
+// OpenAI, Google Gemini, or ElevenLabs, each reusing that provider's API key.
+// `apiTts()` dispatches to the selected one and returns an audio Blob that app.js
+// plays via an <audio> element.
+const ELEVEN_MODEL = "eleven_multilingual_v2";
 
-// ElevenLabs premade voices (work on the free plan), split by gender so the
-// roleplay partner's voice can match the scenario. The multilingual model
-// speaks good Spanish with any of these.
+// Per-provider voice pools, split by gender so the partner's voice matches the
+// scenario. ElevenLabs entries are voice ids; OpenAI / Gemini are voice names.
 const TTS_VOICES = {
-  male: [
-    ["onwK4e9ZLuTAKqWW03F9", "Daniel"],
-    ["JBFqnCBsd6RMkjVDRZzb", "George"],
-    ["cjVigY5qzO86Huf0OWal", "Eric"],
-  ],
-  female: [
-    ["EXAVITQu4vr4xnSDxMaL", "Sarah"],
-    ["XB0fDUnXU5powFXDhCwa", "Charlotte"],
-    ["pFZP5JQG7iQjIQuC4Bku", "Lily"],
-  ],
+  elevenlabs: {
+    male: ["onwK4e9ZLuTAKqWW03F9", "JBFqnCBsd6RMkjVDRZzb", "cjVigY5qzO86Huf0OWal"],
+    female: ["EXAVITQu4vr4xnSDxMaL", "XB0fDUnXU5powFXDhCwa", "pFZP5JQG7iQjIQuC4Bku"],
+  },
+  openai: { male: ["onyx", "echo", "ash"], female: ["nova", "shimmer", "coral"] },
+  gemini: { male: ["Charon", "Orus", "Fenrir"], female: ["Kore", "Leda", "Aoede"] },
 };
 
 // One consistent voice per session (so the partner doesn't change voice
 // mid-conversation), from the gender pool when known, else the whole set.
-function ttsVoiceForSession(sessionId, gender) {
-  const pool = TTS_VOICES[gender] || [...TTS_VOICES.male, ...TTS_VOICES.female];
+function pickVoice(provider, sessionId, gender) {
+  const pools = TTS_VOICES[provider];
+  const pool = pools[gender] || [...pools.male, ...pools.female];
   let h = 0;
   for (const ch of String(sessionId || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return pool[h % pool.length];
 }
 
 // The TTS backend is an explicit user choice (Audio settings): "none" (off),
-// "browser" (free built-in speech synthesis), or "elevenlabs" (premium, needs a
-// key). Default is "none" — but existing ElevenLabs users (a key already set,
-// no explicit choice yet) keep their audio. Returns the effective backend.
+// "browser" (free built-in speech synthesis), "openai", "gemini", or
+// "elevenlabs". Default "none" — but existing ElevenLabs users (a key already
+// set, no explicit choice yet) keep their audio. Cloud backends reuse the
+// provider's API key (openaiApiKey / geminiApiKey / elevenLabsApiKey).
 function ttsBackend() {
   const stored = localStorage.getItem("ttsBackend");
-  if (stored === "none" || stored === "browser" || stored === "elevenlabs") return stored;
+  if (["none", "browser", "openai", "gemini", "elevenlabs"].includes(stored)) return stored;
   return getElevenLabsKey() ? "elevenlabs" : "none";
 }
-function ttsHasElevenLabs() {
-  return Boolean(getElevenLabsKey());
+// localStorage key holding the API key for a cloud TTS backend (null otherwise).
+function ttsBackendKeyName(backend = ttsBackend()) {
+  return { openai: "openaiApiKey", gemini: "geminiApiKey", elevenlabs: "elevenLabsApiKey" }[backend] || null;
 }
 // Audio is available when the chosen backend can actually play.
 function ttsAvailable() {
   const b = ttsBackend();
   if (b === "browser") return typeof speechSynthesis !== "undefined";
-  if (b === "elevenlabs") return ttsHasElevenLabs();
-  return false; // none
+  const keyName = ttsBackendKeyName(b);
+  return keyName ? Boolean(getKey(keyName)) : false;
 }
 
+// Dispatch to the selected cloud backend → audio Blob. (Browser synthesis is in
+// app.js; "none" never reaches here.)
 async function apiTts({ text, sessionId, slow, gender }) {
-  const key = getElevenLabsKey();
-  if (!key) throw new Error("TTS not configured — add an ElevenLabs API key in Settings.");
   if (!text || typeof text !== "string" || text.length > 600) {
     throw new Error("text is required (max 600 chars)");
   }
-  const speed = slow ? 0.8 : 1.0;
-  const [voiceId] = ttsVoiceForSession(sessionId, gender);
-  const res = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
-    {
-      method: "POST",
-      headers: { "xi-api-key": key, "Content-Type": "application/json" },
-      body: JSON.stringify({ text, model_id: TTS_MODEL, voice_settings: { speed } }),
-    }
-  );
+  const backend = ttsBackend();
+  if (backend === "openai") return openaiTts({ text, sessionId, slow, gender });
+  if (backend === "gemini") return geminiTts({ text, sessionId, gender });
+  if (backend === "elevenlabs") return elevenLabsTts({ text, sessionId, slow, gender });
+  throw new Error("No cloud TTS backend selected.");
+}
+
+async function elevenLabsTts({ text, sessionId, slow, gender }) {
+  const key = getElevenLabsKey();
+  if (!key) throw new Error("Add your ElevenLabs API key in Settings.");
+  const voiceId = pickVoice("elevenlabs", sessionId, gender);
+  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+    method: "POST",
+    headers: { "xi-api-key": key, "Content-Type": "application/json" },
+    body: JSON.stringify({ text, model_id: ELEVEN_MODEL, voice_settings: { speed: slow ? 0.8 : 1.0 } }),
+  });
   if (!res.ok) {
-    let detail = `TTS failed (${res.status})`;
-    try {
-      detail = (await res.json())?.detail?.message || detail;
-    } catch {}
+    let detail = `ElevenLabs TTS failed (${res.status})`;
+    try { detail = (await res.json())?.detail?.message || detail; } catch {}
     throw new Error(detail);
   }
   return await res.blob();
+}
+
+// OpenAI /v1/audio/speech (reuses the OpenAI key). gpt-4o-mini-tts ignores the
+// `speed` param, so "slow" is requested via the `instructions` field.
+async function openaiTts({ text, sessionId, slow, gender }) {
+  const key = getKey("openaiApiKey");
+  if (!key) throw new Error("Add your OpenAI API key in Settings.");
+  const body = {
+    model: "gpt-4o-mini-tts",
+    input: text,
+    voice: pickVoice("openai", sessionId, gender),
+    response_format: "mp3",
+  };
+  if (slow) body.instructions = "Speak slowly and clearly, for a language learner.";
+  const res = await fetch("https://api.openai.com/v1/audio/speech", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `OpenAI TTS failed (${res.status})`;
+    try { detail = (await res.json())?.error?.message || detail; } catch {}
+    throw new Error(detail);
+  }
+  return await res.blob();
+}
+
+// Google Gemini TTS (reuses the Gemini key). Returns base64 PCM (L16) which we
+// wrap into a WAV blob; no speed control, so "slow" plays at normal speed.
+async function geminiTts({ text, sessionId, gender }) {
+  const key = getKey("geminiApiKey");
+  if (!key) throw new Error("Add your Google Gemini API key in Settings.");
+  const voiceName = pickVoice("gemini", sessionId, gender);
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+        },
+      }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || `Gemini TTS failed (${res.status})`);
+  const inline = (data.candidates?.[0]?.content?.parts ?? []).find((p) => p.inlineData)?.inlineData;
+  if (!inline?.data) throw new Error("Gemini returned no audio.");
+  const rate = parseInt((inline.mimeType?.match(/rate=(\d+)/) || [])[1] || "24000", 10);
+  return pcmBase64ToWavBlob(inline.data, rate);
+}
+
+// Wrap raw little-endian 16-bit mono PCM (base64) in a minimal WAV container so
+// it plays in an <audio> element.
+function pcmBase64ToWavBlob(b64, sampleRate) {
+  const bin = atob(b64);
+  const pcm = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) pcm[i] = bin.charCodeAt(i);
+  const blockAlign = 2; // mono, 16-bit
+  const buf = new ArrayBuffer(44 + pcm.length);
+  const view = new DataView(buf);
+  const str = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); view.setUint32(4, 36 + pcm.length, true); str(8, "WAVE");
+  str(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true); view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  str(36, "data"); view.setUint32(40, pcm.length, true);
+  new Uint8Array(buf, 44).set(pcm);
+  return new Blob([buf], { type: "audio/wav" });
 }

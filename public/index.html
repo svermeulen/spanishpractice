@@ -60,7 +60,8 @@
 
               <div class="settings-tabs" role="tablist">
                 <button class="settings-tab" type="button" data-tab="general" role="tab" aria-selected="true">General</button>
-                <button class="settings-tab" type="button" data-tab="model" role="tab" aria-selected="false">Model &amp; keys</button>
+                <button class="settings-tab" type="button" data-tab="model" role="tab" aria-selected="false">AI Model</button>
+                <button class="settings-tab" type="button" data-tab="audio" role="tab" aria-selected="false">Audio</button>
               </div>
 
               <div class="settings-panel" id="tab-general" role="tabpanel">
@@ -94,19 +95,22 @@
                 <label class="setting setting-row">
                   <span><input type="checkbox" id="showCost" /> Show session cost</span>
                 </label>
+              </div>
 
-                <h3 class="settings-section">Audio</h3>
+              <div class="settings-panel hidden" id="tab-audio" role="tabpanel">
                 <label class="setting setting-row">
                   <span>Text-to-speech</span>
                   <select id="ttsBackendSelect"></select>
                 </label>
-                <label class="setting setting-col" id="set-elevenlabs">
-                  <span>ElevenLabs API key</span>
-                  <input type="password" id="elevenLabsKey" class="setting-input" placeholder="ElevenLabs key..." autocomplete="off" spellcheck="false" />
+                <label class="setting setting-col" id="set-ttskey">
+                  <span id="ttsKeyLabel">API key</span>
+                  <input type="password" id="ttsKey" class="setting-input" autocomplete="off" spellcheck="false" />
+                  <p class="settings-note" id="ttsKeyNote"></p>
                 </label>
                 <label class="setting setting-row tts-only">
                   <span><input type="checkbox" id="autoPlayAudio" /> Auto-play replies 🔊</span>
                 </label>
+                <p class="settings-note">Cloud voices call the provider directly with your key. Browser voices are free but lower quality. ⌥-click a 🔊 button for slower playback.</p>
               </div>
 
               <div class="settings-panel hidden" id="tab-model" role="tabpanel">

@@ -19,10 +19,11 @@ provider you choose. Nothing is logged or proxied.
   "more natural" phrasing is offered when it differs meaningfully.
 - **Tutor side-panel** — ask grammar/vocabulary questions in English at any
   time; it has the conversation transcript as context.
-- **Audio** — 🔊 buttons speak any line (⌥-click for slower), and replies
-  auto-play by default. Works out of the box with your browser's built-in
-  Spanish voices; add an ElevenLabs key for higher-quality, gender-matched
-  voices.
+- **Audio** — optional text-to-speech for any line (🔊 buttons, ⌥-click for
+  slower; replies can auto-play). Choose a voice backend in Settings → Audio:
+  free browser voices, or higher-quality **OpenAI / Google Gemini / ElevenLabs**
+  — the first two reuse the same key as chat, so no extra signup. Voices are
+  gender-matched to the scenario.
 - **Voice input** — where the browser supports it, flip the composer into voice
   mode and tap to talk: speak your reply in Spanish, tap again to stop, and it
   transcribes and sends automatically (`⌘⇧M` toggles recording).

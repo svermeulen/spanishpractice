@@ -246,15 +246,15 @@ async function playTts(text, slow, btn, auto = false) {
   }
   stopAudio();
 
-  // Browser path: built-in speech synthesis (the chosen backend, or the only
-  // option). The ElevenLabs path below only runs when that backend is selected.
+  // Browser path: built-in speech synthesis. The cloud path below runs for the
+  // openai / gemini / elevenlabs backends (apiTts dispatches to the right one).
   if (ttsBackend() === "browser") {
     if (typeof speechSynthesis !== "undefined") speakBrowser(text, slow, btn);
     return;
   }
 
-  // Premium path: ElevenLabs — fetch the mp3 (cached as object URLs).
-  const cacheKey = `${voiceGender}|${slow}|${text}`;
+  // Cloud path: fetch the audio via apiTts (cached as object URLs per session).
+  const cacheKey = `${ttsBackend()}|${voiceGender}|${slow}|${text}`;
   btn.classList.add("loading");
   try {
     let url = audioCache.get(cacheKey);
@@ -891,6 +891,8 @@ function maybeResumeOpening() {
 
 // Settings input id ↔ localStorage key. Used for binding and for reflecting
 // onboarding's writes back into the popover.
+// AI Model tab key inputs. (The ElevenLabs key, and the OpenAI/Gemini keys when
+// used for TTS, are edited via the Audio tab's dynamic #ttsKey field instead.)
 const KEY_INPUTS = [
   ["anthropicKey", "anthropicApiKey"],
   ["openaiKey", "openaiApiKey"],
@@ -898,10 +900,12 @@ const KEY_INPUTS = [
   ["compatBaseUrl", "compatibleBaseUrl"],
   ["compatKey", "compatibleApiKey"],
   ["compatModel", "compatibleModel"],
-  ["elevenLabsKey", "elevenLabsApiKey"],
 ];
 for (const [id, k] of KEY_INPUTS) {
-  bindKeyInput(id, k, k === "elevenLabsApiKey" ? applyTtsVisibility : maybeResumeOpening);
+  bindKeyInput(id, k, () => {
+    maybeResumeOpening();
+    applyTtsVisibility(); // an OpenAI/Gemini key may enable that TTS backend
+  });
 }
 function syncSettingsInputs() {
   for (const [id, k] of KEY_INPUTS) $(id).value = localStorage.getItem(k) || "";
@@ -1092,19 +1096,48 @@ autoPlayAudioEl.addEventListener("change", () => {
   localStorage.setItem("autoPlayAudio", String(autoPlayAudio));
 });
 
-// Text-to-speech backend: None (off, default) / Browser voices / ElevenLabs.
-// The ElevenLabs key field is dimmed+disabled unless that backend is selected;
-// changing the backend re-evaluates whether the 🔊 buttons show (body.no-tts).
+// Text-to-speech backend: None (off, default) / Browser / OpenAI / Gemini /
+// ElevenLabs. The cloud backends each need an API key; a single field below
+// binds to the selected backend's key (reusing the OpenAI / Gemini chat keys).
 const TTS_BACKENDS = [
   { value: "none", label: "None (off)" },
   { value: "browser", label: "Browser voices (free)" },
-  { value: "elevenlabs", label: "ElevenLabs (best quality)" },
+  { value: "openai", label: "OpenAI" },
+  { value: "gemini", label: "Google Gemini" },
+  { value: "elevenlabs", label: "ElevenLabs" },
 ];
+// Per-backend config for the dynamic TTS key field.
+const TTS_KEY_FIELDS = {
+  openai: { key: "openaiApiKey", label: "OpenAI API key", ph: "sk-...", note: "Reuses your OpenAI key — same one as OpenAI chat models." },
+  gemini: { key: "geminiApiKey", label: "Google Gemini API key", ph: "AIza...", note: "Reuses your Gemini key — same one as Gemini chat models." },
+  elevenlabs: { key: "elevenLabsApiKey", label: "ElevenLabs API key", ph: "ElevenLabs key...", note: "" },
+};
+// Show/refresh the dynamic key field for the selected cloud backend (hidden for
+// none/browser); binds the one input to that backend's localStorage key.
 function applyAudioState() {
-  const isEleven = ttsBackend() === "elevenlabs";
-  $("set-elevenlabs").classList.toggle("setting-inactive", !isEleven);
-  $("elevenLabsKey").disabled = !isEleven;
+  const conf = TTS_KEY_FIELDS[ttsBackend()];
+  const block = $("set-ttskey");
+  if (!conf) {
+    block.classList.add("hidden");
+    return;
+  }
+  block.classList.remove("hidden");
+  $("ttsKeyLabel").textContent = conf.label;
+  $("ttsKeyNote").textContent = conf.note;
+  $("ttsKeyNote").classList.toggle("hidden", !conf.note);
+  const input = $("ttsKey");
+  input.placeholder = conf.ph;
+  input.dataset.key = conf.key;
+  input.value = localStorage.getItem(conf.key) || "";
 }
+$("ttsKey").addEventListener("input", () => {
+  const input = $("ttsKey");
+  const v = input.value.trim();
+  if (v) localStorage.setItem(input.dataset.key, v);
+  else localStorage.removeItem(input.dataset.key);
+  syncSettingsInputs(); // keep the matching AI-Model-tab key field in sync
+  applyTtsVisibility();
+});
 const ttsBackendSelectEl = $("ttsBackendSelect");
 for (const b of TTS_BACKENDS) {
   const o = document.createElement("option");
@@ -1134,12 +1167,17 @@ checkAccentsEl.addEventListener("change", () => {
 const settingsBtn = $("settingsBtn");
 const settingsPopup = $("settingsPopup");
 
-// Two tabs: "general" (everyday settings) and "model" (model + provider keys).
+// Three tabs: "general" (everyday settings), "model" (AI model + provider keys),
+// "audio" (TTS). Refresh the key inputs on every switch so the OpenAI/Gemini key
+// stays consistent between the AI Model tab and the Audio tab (they share it).
 const settingsTabs = document.querySelectorAll(".settings-tab");
 function showSettingsTab(name) {
   settingsTabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
   $("tab-general").classList.toggle("hidden", name !== "general");
   $("tab-model").classList.toggle("hidden", name !== "model");
+  $("tab-audio").classList.toggle("hidden", name !== "audio");
+  syncSettingsInputs();
+  applyAudioState();
 }
 settingsTabs.forEach((t) => t.addEventListener("click", () => showSettingsTab(t.dataset.tab)));
 
