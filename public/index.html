@@ -26,15 +26,15 @@
               <span>Model</span>
               <select id="modelSelect"></select>
             </label>
-            <label class="setting setting-col">
+            <label class="setting setting-col" id="set-anthropic">
               <span>Anthropic API key</span>
               <input type="password" id="anthropicKey" class="setting-input" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
             </label>
-            <label class="setting setting-col">
+            <label class="setting setting-col" id="set-openai">
               <span>OpenAI API key</span>
               <input type="password" id="openaiKey" class="setting-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
             </label>
-            <label class="setting setting-col">
+            <label class="setting setting-col" id="set-gemini">
               <span>Google Gemini API key</span>
               <input type="password" id="geminiKey" class="setting-input" placeholder="AIza..." autocomplete="off" spellcheck="false" />
             </label>
@@ -42,7 +42,7 @@
               <span>ElevenLabs API key <span class="setting-hint">(optional — enables 🔊)</span></span>
               <input type="password" id="elevenLabsKey" class="setting-input" placeholder="ElevenLabs key..." autocomplete="off" spellcheck="false" />
             </label>
-            <details class="setting-details">
+            <details class="setting-details" id="set-compatible">
               <summary>Custom OpenAI-compatible endpoint</summary>
               <label class="setting setting-col">
                 <span>Base URL</span>

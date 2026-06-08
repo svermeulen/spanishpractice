@@ -663,9 +663,35 @@ if (modelSelectEl.value !== model) {
   model = modelSelectEl.value || "claude-haiku-4-5";
   localStorage.setItem("model", model);
 }
+
+// Show only the key/endpoint settings for the selected model's provider; the
+// model select and ElevenLabs key always stay visible. Re-run on model change.
+const PROVIDER_SETTING_IDS = {
+  anthropic: "set-anthropic",
+  openai: "set-openai",
+  gemini: "set-gemini",
+  compatible: "set-compatible",
+};
+function applyProviderVisibility() {
+  const active = resolveModel(model).providerId;
+  for (const [pid, id] of Object.entries(PROVIDER_SETTING_IDS)) {
+    const show = pid === active;
+    $(id).classList.toggle("hidden", !show);
+    // Expand the custom-endpoint disclosure when it's the active provider.
+    if (id === "set-compatible") $(id).open = show;
+  }
+}
+// Focus the (visible) key field of the selected model's provider.
+function focusActiveProviderKey() {
+  const block = $(PROVIDER_SETTING_IDS[resolveModel(model).providerId]);
+  block?.querySelector("input")?.focus();
+}
+applyProviderVisibility();
+
 modelSelectEl.addEventListener("change", () => {
   model = modelSelectEl.value;
   localStorage.setItem("model", model);
+  applyProviderVisibility();
   maybeResumeOpening();
 });
 
@@ -789,7 +815,7 @@ if (!isDemo) {
   startRandomSession();
   if (!hasKeyForModel(model)) {
     toggleSettings(true);
-    $("anthropicKey").focus();
+    focusActiveProviderKey();
   }
 }
 
