@@ -204,7 +204,27 @@ header {
   gap: 11px;
   animation: rise-in 0.18s ease-out;
 }
-.settings-card-title { font-size: 18px; font-weight: 650; margin-bottom: 4px; }
+.settings-card-title { font-size: 18px; font-weight: 650; margin-bottom: 2px; }
+/* Tab bar (General | Model & keys) */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-tab {
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.settings-tab:hover { color: var(--text); }
+.settings-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.settings-panel { display: flex; flex-direction: column; gap: 11px; }
 /* Section divider heading (e.g. "Conversation") */
 .settings-section {
   font-size: 11px;
@@ -216,24 +236,10 @@ header {
   padding-top: 13px;
   border-top: 1px solid var(--border);
 }
-/* Collapsed "API keys" disclosure — tucked away since keys are set-once */
-.settings-keys {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 7px;
-  padding-top: 13px;
-  border-top: 1px solid var(--border);
-}
-.settings-keys > summary {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  cursor: pointer;
-  user-select: none;
-}
-.settings-keys > summary:hover { color: var(--accent); }
-.settings-keys[open] > summary { margin-bottom: 2px; }
+/* A settings block that doesn't apply to the current choice — shown but dimmed
+   and non-interactive (its inputs are also set disabled in JS), so nothing pops
+   in and out of existence when the model / audio backend changes. */
+.setting-inactive { opacity: 0.4; }
 .setting {
   font-size: 13px;
   color: var(--muted);

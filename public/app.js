@@ -244,8 +244,9 @@ async function playTts(text, slow, btn, auto = false) {
   }
   stopAudio();
 
-  // Free path: browser speech synthesis (no ElevenLabs key).
-  if (!ttsHasElevenLabs()) {
+  // Browser path: built-in speech synthesis (the chosen backend, or the only
+  // option). The ElevenLabs path below only runs when that backend is selected.
+  if (ttsBackend() === "browser") {
     if (typeof speechSynthesis !== "undefined") speakBrowser(text, slow, btn);
     return;
   }
@@ -925,8 +926,9 @@ if (modelSelectEl.selectedIndex === -1) {
 }
 if (!model) modelSelectEl.selectedIndex = 0; // show the placeholder
 
-// Show only the key/endpoint settings for the selected model's provider; the
-// model select and ElevenLabs key always stay visible. Re-run on model change.
+// In the Model tab, every provider's key block is shown; the one the selected
+// model uses is interactive, the others are dimmed + disabled (nothing pops in
+// and out of existence on model change). Re-run on model change.
 const PROVIDER_SETTING_IDS = {
   anthropic: "set-anthropic",
   openai: "set-openai",
@@ -934,17 +936,15 @@ const PROVIDER_SETTING_IDS = {
   compatible: "set-compatible",
 };
 function applyProviderVisibility() {
-  // No model chosen yet → show no provider block (just the model picker).
   const active = model ? resolveModel(model).providerId : null;
   for (const [pid, id] of Object.entries(PROVIDER_SETTING_IDS)) {
-    const show = pid === active;
-    $(id).classList.toggle("hidden", !show);
-    // Expand the custom-endpoint disclosure when it's the active provider.
-    if (id === "set-compatible") $(id).open = show;
+    const isActive = pid === active;
+    const block = $(id);
+    block.classList.toggle("setting-inactive", !isActive);
+    block.querySelectorAll("input").forEach((i) => (i.disabled = !isActive));
+    // The custom-endpoint disclosure expands only when it's the active provider.
+    if (id === "set-compatible") block.open = isActive;
   }
-  // Keys live in a collapsed disclosure (they're set-once) — but pop it open
-  // automatically when the chosen model can't run yet, so the field is findable.
-  if (model && !hasKeyForModel(model)) $("set-keys").open = true;
 }
 applyProviderVisibility();
 
@@ -1082,6 +1082,34 @@ autoPlayAudioEl.addEventListener("change", () => {
   localStorage.setItem("autoPlayAudio", String(autoPlayAudio));
 });
 
+// Text-to-speech backend: None (off, default) / Browser voices / ElevenLabs.
+// The ElevenLabs key field is dimmed+disabled unless that backend is selected;
+// changing the backend re-evaluates whether the 🔊 buttons show (body.no-tts).
+const TTS_BACKENDS = [
+  { value: "none", label: "None (off)" },
+  { value: "browser", label: "Browser voices (free)" },
+  { value: "elevenlabs", label: "ElevenLabs (best quality)" },
+];
+function applyAudioState() {
+  const isEleven = ttsBackend() === "elevenlabs";
+  $("set-elevenlabs").classList.toggle("setting-inactive", !isEleven);
+  $("elevenLabsKey").disabled = !isEleven;
+}
+const ttsBackendSelectEl = $("ttsBackendSelect");
+for (const b of TTS_BACKENDS) {
+  const o = document.createElement("option");
+  o.value = b.value;
+  o.textContent = b.label;
+  ttsBackendSelectEl.appendChild(o);
+}
+ttsBackendSelectEl.value = ttsBackend();
+ttsBackendSelectEl.addEventListener("change", () => {
+  localStorage.setItem("ttsBackend", ttsBackendSelectEl.value);
+  applyAudioState();
+  applyTtsVisibility();
+});
+applyAudioState();
+
 // Strict accent/punctuation checking. Applies to subsequent messages — past
 // corrections were generated (and diffed) under the previous policy, so they're
 // left as-is rather than retroactively re-judged.
@@ -1095,10 +1123,22 @@ checkAccentsEl.addEventListener("change", () => {
 // ---- Settings modal ----
 const settingsBtn = $("settingsBtn");
 const settingsPopup = $("settingsPopup");
+
+// Two tabs: "general" (everyday settings) and "model" (model + provider keys).
+const settingsTabs = document.querySelectorAll(".settings-tab");
+function showSettingsTab(name) {
+  settingsTabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
+  $("tab-general").classList.toggle("hidden", name !== "general");
+  $("tab-model").classList.toggle("hidden", name !== "model");
+}
+settingsTabs.forEach((t) => t.addEventListener("click", () => showSettingsTab(t.dataset.tab)));
+
 function toggleSettings(show) {
   const willShow = show ?? settingsPopup.classList.contains("hidden");
   settingsPopup.classList.toggle("hidden", !willShow);
   settingsBtn.setAttribute("aria-expanded", String(willShow));
+  // Open straight to the Model tab when the chosen model still needs its key.
+  if (willShow) showSettingsTab(model && !hasKeyForModel(model) ? "model" : "general");
 }
 settingsBtn.addEventListener("click", () => toggleSettings());
 $("settingsClose").addEventListener("click", () => toggleSettings(false));

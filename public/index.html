@@ -58,46 +58,63 @@
               <button id="settingsClose" class="onb-close" type="button" title="Close" aria-label="Close">×</button>
               <h2 id="settingsTitle" class="settings-card-title">Settings</h2>
 
-              <label class="setting setting-row">
-                <span>Model</span>
-                <select id="modelSelect"></select>
-              </label>
-              <label class="setting setting-row">
-                <span>Level</span>
-                <select id="levelSelect"></select>
-              </label>
+              <div class="settings-tabs" role="tablist">
+                <button class="settings-tab" type="button" data-tab="general" role="tab" aria-selected="true">General</button>
+                <button class="settings-tab" type="button" data-tab="model" role="tab" aria-selected="false">Model &amp; keys</button>
+              </div>
 
-              <h3 class="settings-section">Appearance</h3>
-              <label class="setting setting-row">
-                <span>Theme</span>
-                <select id="themeSelect"></select>
-              </label>
-              <label class="setting setting-row">
-                <span>Mode</span>
-                <select id="appearanceSelect"></select>
-              </label>
+              <div class="settings-panel" id="tab-general" role="tabpanel">
+                <label class="setting setting-row">
+                  <span>Level</span>
+                  <select id="levelSelect"></select>
+                </label>
 
-              <h3 class="settings-section">Conversation</h3>
-              <label class="setting setting-row">
-                <span><input type="checkbox" id="autoShowEn" /> Auto-show translations</span>
-                <kbd class="setting-key">⌘E</kbd>
-              </label>
-              <label class="setting setting-row">
-                <span><input type="checkbox" id="autoShowNotes" /> Auto-show notes</span>
-                <kbd class="setting-key">⌘I</kbd>
-              </label>
-              <label class="setting setting-row">
-                <span><input type="checkbox" id="checkAccents" /> Correct accents &amp; punctuation</span>
-              </label>
-              <label class="setting setting-row tts-only">
-                <span><input type="checkbox" id="autoPlayAudio" /> Auto-play replies 🔊</span>
-              </label>
-              <label class="setting setting-row">
-                <span><input type="checkbox" id="showCost" /> Show session cost</span>
-              </label>
+                <h3 class="settings-section">Appearance</h3>
+                <label class="setting setting-row">
+                  <span>Theme</span>
+                  <select id="themeSelect"></select>
+                </label>
+                <label class="setting setting-row">
+                  <span>Mode</span>
+                  <select id="appearanceSelect"></select>
+                </label>
 
-              <details class="settings-keys" id="set-keys">
-                <summary>API keys &amp; custom endpoint</summary>
+                <h3 class="settings-section">Conversation</h3>
+                <label class="setting setting-row">
+                  <span><input type="checkbox" id="autoShowEn" /> Auto-show translations</span>
+                  <kbd class="setting-key">⌘E</kbd>
+                </label>
+                <label class="setting setting-row">
+                  <span><input type="checkbox" id="autoShowNotes" /> Auto-show notes</span>
+                  <kbd class="setting-key">⌘I</kbd>
+                </label>
+                <label class="setting setting-row">
+                  <span><input type="checkbox" id="checkAccents" /> Correct accents &amp; punctuation</span>
+                </label>
+                <label class="setting setting-row">
+                  <span><input type="checkbox" id="showCost" /> Show session cost</span>
+                </label>
+
+                <h3 class="settings-section">Audio</h3>
+                <label class="setting setting-row">
+                  <span>Text-to-speech</span>
+                  <select id="ttsBackendSelect"></select>
+                </label>
+                <label class="setting setting-col" id="set-elevenlabs">
+                  <span>ElevenLabs API key <span class="setting-hint">(required for the ElevenLabs voice)</span></span>
+                  <input type="password" id="elevenLabsKey" class="setting-input" placeholder="ElevenLabs key..." autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="setting setting-row tts-only">
+                  <span><input type="checkbox" id="autoPlayAudio" /> Auto-play replies 🔊</span>
+                </label>
+              </div>
+
+              <div class="settings-panel hidden" id="tab-model" role="tabpanel">
+                <label class="setting setting-row">
+                  <span>Model</span>
+                  <select id="modelSelect"></select>
+                </label>
+                <p class="settings-note">Enter the API key for your selected model's provider — the others are dimmed.</p>
                 <label class="setting setting-col" id="set-anthropic">
                   <span>Anthropic API key</span>
                   <input type="password" id="anthropicKey" class="setting-input" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
@@ -109,10 +126,6 @@
                 <label class="setting setting-col" id="set-gemini">
                   <span>Google Gemini API key</span>
                   <input type="password" id="geminiKey" class="setting-input" placeholder="AIza..." autocomplete="off" spellcheck="false" />
-                </label>
-                <label class="setting setting-col">
-                  <span>ElevenLabs API key <span class="setting-hint">(optional — enables 🔊)</span></span>
-                  <input type="password" id="elevenLabsKey" class="setting-input" placeholder="ElevenLabs key..." autocomplete="off" spellcheck="false" />
                 </label>
                 <details class="setting-details" id="set-compatible">
                   <summary>Custom OpenAI-compatible endpoint</summary>
@@ -131,7 +144,7 @@
                   <p class="settings-note">Choose “Custom (OpenAI-compatible)” in the model list to use this. Works with OpenRouter, Groq, Together, etc. Local servers (Ollama / LM Studio) only work when this page is opened over <code>http://</code> — a hosted <code>https</code> page can't call <code>http://localhost</code> (mixed content). Cost isn't tracked for custom endpoints.</p>
                 </details>
                 <p class="settings-note">Keys are stored only in this browser and sent directly to each provider — never to any server. Tip: use keys with a spending limit.</p>
-              </details>
+              </div>
             </div>
           </div>
         </div>

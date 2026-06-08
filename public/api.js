@@ -644,13 +644,24 @@ function ttsVoiceForSession(sessionId, gender) {
   return pool[h % pool.length];
 }
 
-// ElevenLabs is the premium path (needs a key); the browser's built-in speech
-// synthesis is the free fallback. Audio is available if either exists.
+// The TTS backend is an explicit user choice (Audio settings): "none" (off),
+// "browser" (free built-in speech synthesis), or "elevenlabs" (premium, needs a
+// key). Default is "none" — but existing ElevenLabs users (a key already set,
+// no explicit choice yet) keep their audio. Returns the effective backend.
+function ttsBackend() {
+  const stored = localStorage.getItem("ttsBackend");
+  if (stored === "none" || stored === "browser" || stored === "elevenlabs") return stored;
+  return getElevenLabsKey() ? "elevenlabs" : "none";
+}
 function ttsHasElevenLabs() {
   return Boolean(getElevenLabsKey());
 }
+// Audio is available when the chosen backend can actually play.
 function ttsAvailable() {
-  return ttsHasElevenLabs() || typeof speechSynthesis !== "undefined";
+  const b = ttsBackend();
+  if (b === "browser") return typeof speechSynthesis !== "undefined";
+  if (b === "elevenlabs") return ttsHasElevenLabs();
+  return false; // none
 }
 
 async function apiTts({ text, sessionId, slow, gender }) {
