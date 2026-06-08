@@ -17,7 +17,7 @@
   --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.07);
   /* Scrim over the optional scene-background image; tints toward the active
      theme's --bg so the frosted UI stays legible over any photo. */
-  --scene-scrim: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 42%, transparent), color-mix(in srgb, var(--bg) 66%, transparent));
+  --scene-scrim: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 14%, transparent), color-mix(in srgb, var(--bg) 32%, transparent));
   color-scheme: light;
 }
 html.dark {
@@ -26,7 +26,7 @@ html.dark {
   --soft: #fbbf24; --soft-bg: rgba(180, 83, 9, 0.22);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
   --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
-  --scene-scrim: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 56%, transparent), color-mix(in srgb, var(--bg) 80%, transparent));
+  --scene-scrim: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 28%, transparent), color-mix(in srgb, var(--bg) 50%, transparent));
   color-scheme: dark;
 }
 
@@ -124,12 +124,12 @@ button { font-family: inherit; }
 body.has-scene { background: transparent; }
 body.has-scene header,
 body.has-scene .pane {
-  background: color-mix(in srgb, var(--pane-bg) 68%, transparent);
+  background: color-mix(in srgb, var(--pane-bg) 46%, transparent);
   -webkit-backdrop-filter: blur(var(--scene-blur, 6px)) saturate(1.2);
   backdrop-filter: blur(var(--scene-blur, 6px)) saturate(1.2);
 }
 body.has-scene .tutor-pane {
-  background: color-mix(in srgb, var(--pane-alt) 68%, transparent);
+  background: color-mix(in srgb, var(--pane-alt) 46%, transparent);
 }
 
 /* ---- Main layout ---- */
