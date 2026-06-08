@@ -885,18 +885,20 @@ function imageAvailable() {
   return keyName ? Boolean(getKey(keyName)) : false;
 }
 
-// Art styles for the scene background. Each `prompt` fragment is the lead-in
-// medium descriptor; `buildImagePrompt` keeps the composition constraints
-// (establishing shot, no foreground people, no text) constant across styles.
+// Art styles for the scene background. Each `prompt` is a trailing "Rendered
+// as …" modifier that `buildImagePrompt` appends AFTER the setting, so the scene
+// drives the content and the style only sets the medium. Avoid named studios /
+// artists (e.g. "Studio Ghibli") — those tokens carry strong subject-matter
+// priors that hijack the scene; use plain descriptive medium terms instead.
 const IMAGE_STYLES = {
-  photo: { label: "Photographic", prompt: "A photorealistic, atmospheric photograph" },
-  watercolor: { label: "Watercolor", prompt: "A soft, loose watercolor painting" },
-  oil: { label: "Oil painting", prompt: "A richly textured oil painting" },
-  anime: { label: "Anime", prompt: "A lush, painterly anime / Studio-Ghibli-style illustration" },
-  storybook: { label: "Storybook", prompt: "A warm, whimsical children's-storybook illustration" },
-  flat: { label: "Flat vector", prompt: "A clean, modern flat-vector illustration with simple shapes and flat colors" },
-  pixel: { label: "Pixel art", prompt: "Detailed retro 16-bit pixel art" },
-  poster: { label: "Travel poster", prompt: "A vintage mid-century travel-poster illustration" },
+  photo: { label: "Photographic", prompt: "Rendered as a realistic, atmospheric photograph with natural lighting." },
+  watercolor: { label: "Watercolor", prompt: "Rendered as a soft, loose watercolor painting." },
+  oil: { label: "Oil painting", prompt: "Rendered as a richly textured oil painting." },
+  anime: { label: "Anime", prompt: "Rendered as a hand-painted anime-style illustration with soft cel shading, clean linework, and a warm color palette." },
+  storybook: { label: "Storybook", prompt: "Rendered as a warm, whimsical children's-storybook illustration." },
+  flat: { label: "Flat vector", prompt: "Rendered as a clean, modern flat-vector illustration with simple shapes and flat colors." },
+  pixel: { label: "Pixel art", prompt: "Rendered as detailed retro 16-bit pixel art." },
+  poster: { label: "Travel poster", prompt: "Rendered as a vintage mid-century travel-poster illustration." },
 };
 const DEFAULT_IMAGE_STYLE = "anime";
 function getImageStyle(id) {
@@ -906,12 +908,13 @@ function getImageStyleOptions() {
   return Object.entries(IMAGE_STYLES).map(([value, s]) => ({ value, label: s.label }));
 }
 
-// Wrap a raw scene description in the chosen style plus styling that yields a
-// legible backdrop: a wide establishing shot, nothing crowding the foreground,
-// and no readable text (image models render garbled lettering that looks bad
-// behind real UI text).
+// Wrap a raw scene description for a legible backdrop. The SETTING leads (so it
+// drives the content), the style is a trailing modifier, then the composition
+// constraints: a wide establishing shot, nothing crowding the foreground, and no
+// readable text (image models render garbled lettering that looks bad behind
+// real UI text).
 function buildImagePrompt(scene, style = DEFAULT_IMAGE_STYLE) {
-  return `${getImageStyle(style).prompt} — a wide establishing shot of this setting: ${scene}. No people in the foreground, and absolutely no readable text, words, letters, or signs. Composed to sit softly behind on-screen text.`;
+  return `A wide establishing shot of this setting: ${scene}. ${getImageStyle(style).prompt} No people in the foreground, and absolutely no readable text, words, letters, or signs. Composed to sit softly behind on-screen text.`;
 }
 
 // Dispatch to the selected backend → { blob, usage }. "none" never reaches here.
