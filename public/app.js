@@ -561,16 +561,12 @@ async function sendTutorQuestion(text, existingMsg = null) {
 }
 
 // ---- Session setup ----
-// The header label shows the learner-facing situation; it ellipsizes when long,
-// so its tooltip carries the full text. The 🤖 button's tooltip surfaces the
-// hidden AI-facing prompt (no label swapping).
+// The header label shows the learner-facing situation; it ellipsizes when long.
+// Instant tooltips (attached once, below) carry the full text on the label and
+// the hidden AI-facing prompt on the 🤖 button — no label swapping, no native-
+// title hover delay.
 function renderSituationLabel() {
-  const label = $("situationLabel");
-  label.textContent = `Situation: ${situationDisplay}`;
-  label.title = situationDisplay ? `Situation: ${situationDisplay}` : "";
-  $("aiPromptBtn").title = situation
-    ? `AI prompt: ${situation}`
-    : "Shows the hidden AI prompt once a situation is generated";
+  $("situationLabel").textContent = `Situation: ${situationDisplay}`;
 }
 function showMain() {
   renderSituationLabel();
@@ -707,6 +703,57 @@ $("situationInput").addEventListener("keydown", (e) => {
   }
 });
 $("situationInput").addEventListener("blur", hideSituationEditor);
+
+// ---- Instant tooltips ----
+// Native `title` tooltips have a ~1s hover delay that makes the 🤖 button feel
+// dead. This is a tiny zero-delay replacement: one shared element, shown on
+// hover/focus (and on tap for touch devices, which have no hover), positioned
+// just below its anchor and clamped into the viewport. getText() runs at show
+// time, so the content is always current.
+const tooltipEl = addEl(document.body, "div", "tooltip");
+tooltipEl.setAttribute("role", "tooltip");
+tooltipEl.hidden = true;
+let tooltipAnchor = null;
+
+function showTooltip(anchor, text) {
+  if (!text) return;
+  tooltipAnchor = anchor;
+  tooltipEl.textContent = text;
+  tooltipEl.style.maxWidth = Math.min(360, window.innerWidth - 16) + "px";
+  tooltipEl.hidden = false; // unhide first so we can measure, then place + clamp
+  const r = anchor.getBoundingClientRect();
+  const tw = tooltipEl.offsetWidth, th = tooltipEl.offsetHeight;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - tw - 8));
+  let top = r.bottom + 6;
+  if (top + th > window.innerHeight - 8) top = Math.max(8, r.top - th - 6); // flip above
+  tooltipEl.style.left = left + "px";
+  tooltipEl.style.top = top + "px";
+}
+
+function hideTooltip(anchor) {
+  if (anchor && anchor !== tooltipAnchor) return; // a newer anchor owns it
+  tooltipEl.hidden = true;
+  tooltipAnchor = null;
+}
+
+function attachTooltip(el, getText) {
+  el.addEventListener("mouseenter", () => showTooltip(el, getText()));
+  el.addEventListener("mouseleave", () => hideTooltip(el));
+  el.addEventListener("focus", () => showTooltip(el, getText()));
+  el.addEventListener("blur", () => hideTooltip(el));
+  // Touch has no hover: tap the anchor to show, tap anywhere else to dismiss.
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    showTooltip(el, getText());
+  });
+}
+document.addEventListener("click", () => hideTooltip());
+window.addEventListener("resize", () => hideTooltip());
+
+attachTooltip($("aiPromptBtn"), () =>
+  situation ? `AI prompt: ${situation}` : "The AI prompt appears once a situation is generated."
+);
+attachTooltip($("situationLabel"), () => (situationDisplay ? `Situation: ${situationDisplay}` : ""));
 
 // ---- Keyboard shortcuts ----
 // Defaults below. Rebind without code changes by setting localStorage key

@@ -110,6 +110,24 @@ header {
 }
 .header-controls { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
+/* Instant tooltip (custom, zero-delay) — used for the situation label + 🤖 button */
+.tooltip {
+  position: fixed;
+  z-index: 200;
+  max-width: 360px;
+  background: var(--pane-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px 11px;
+  border-radius: 9px;
+  box-shadow: var(--shadow-lift);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+  animation: onb-fade 0.1s ease-out;
+}
+
 /* Settings gear + popover */
 .settings-wrap { position: relative; }
 .icon-btn {
