@@ -139,6 +139,8 @@ header {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
   animation: rise-in 0.16s ease-out;
 }
 .settings-title {
@@ -184,6 +186,27 @@ header {
   line-height: 1.45;
   color: var(--muted);
   margin: -2px 0 2px;
+}
+.settings-note code {
+  font-size: 10.5px;
+  background: var(--pane-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+.setting-details { font-size: 13px; }
+.setting-details > summary {
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+}
+.setting-details > summary:hover { color: var(--accent); }
+.setting-details[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 4px;
 }
 .setting-key {
   font-family: inherit;

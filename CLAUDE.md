@@ -1,6 +1,6 @@
 # Spanish Converser
 
-Client-only web app for practicing Spanish through AI roleplay conversations. Fully static — there is no server. Each user supplies their own API keys (stored in their browser's localStorage) and the page calls Anthropic / ElevenLabs directly. Deployed as a static site (GitHub Pages); also runnable locally as plain static files.
+Client-only web app for practicing Spanish through AI roleplay conversations. Fully static — there is no server. Each user supplies their own API keys (stored in their browser's localStorage) and the page calls the AI provider / ElevenLabs directly. Supports Anthropic, OpenAI, Google Gemini, and any OpenAI-compatible endpoint (OpenRouter, Groq, local servers, ...) — picked via the model dropdown. Deployed as a static site (GitHub Pages); also runnable locally as plain static files.
 
 ## Running
 
@@ -8,7 +8,7 @@ Client-only web app for practicing Spanish through AI roleplay conversations. Fu
 npm start            # serves public/ at http://localhost:3000 (python3 -m http.server)
 ```
 
-No build step and no dependencies needed to run the app — `npm start` just serves the static `public/` folder. Open the app, click ⚙ Settings, and paste an Anthropic API key (required) and optionally an ElevenLabs key (enables 🔊 audio). Keys live only in the browser and are sent directly to the providers.
+No build step and no dependencies needed to run the app — `npm start` just serves the static `public/` folder. Open the app, click ⚙ Settings, pick a model, and paste the API key for that model's provider (Anthropic / OpenAI / Gemini, or a custom endpoint); optionally add an ElevenLabs key (enables 🔊 audio). Keys live only in the browser and are sent directly to the providers.
 
 Deploy: pushing to `main` publishes `public/` to GitHub Pages via `.github/workflows/deploy.yml` (enable Pages once: Settings → Pages → Source: GitHub Actions).
 
@@ -16,7 +16,7 @@ The only thing that needs Node/npm is regenerating the scenario deck — `npm in
 
 ## Architecture
 
-- `public/api.js` — the direct API layer (this is what used to be `server.js`). Holds the `MODELS` pricing/thinking table (opus-4-8 / sonnet-4-6 / haiku-4-5; default haiku), `computeCost`, the system prompts, the structured-output schemas, and the calls to Anthropic and ElevenLabs. Keys come from localStorage (`anthropicApiKey`, `elevenLabsApiKey`). Anthropic calls use the Messages REST endpoint with the `anthropic-dangerous-direct-browser-access: true` header (CORS opt-in; safe here because it's the user's own key). Each result carries a `usage` payload (tokens + computed cost) shown as a session cost ticker. Exposed functions, all called from `app.js`:
+- `public/api.js` — the direct API layer (this is what used to be `server.js`). Multi-provider via a small adapter layer: the `PROVIDERS` registry (anthropic / openai / gemini / compatible) lists each provider's models with `$/Mtok` pricing, and every provider implements one `complete({ modelId, system, messages, schema, maxTokens })` → `{ text, usage }`. The neutral message shape is `[{role, content}]` with a string `system`; each adapter translates to its provider's request. `complete()` (provider-agnostic) plus `resolveModel` / `getModelOptions` / `hasKeyForModel` sit on top. The roleplay turns use JSON-schema structured output — Anthropic `output_config.format`, OpenAI `response_format` (strict), Gemini `responseSchema` (converted by `toGeminiSchema`: uppercased types, `additionalProperties` dropped, `propertyOrdering` set). All calls are direct browser→provider (Anthropic uses the `anthropic-dangerous-direct-browser-access: true` CORS opt-in; safe because it's the user's own key). Keys live in localStorage: `anthropicApiKey`, `openaiApiKey`, `geminiApiKey`, `elevenLabsApiKey`, plus `compatibleBaseUrl` / `compatibleApiKey` / `compatibleModel` for the custom endpoint (chosen via the `__custom__` dropdown sentinel; pricing unknown so its cost isn't tracked). Each result carries a `usage` payload (tokens + computed cost) shown as a session cost ticker. Default model is Haiku 4.5. Pricing note: only the Anthropic numbers are authoritative; OpenAI/Gemini are approximate estimates — update them in `PROVIDERS` if they drift. Exposed functions, all called from `app.js`:
   - `apiChat({situation, history, message, model})` — one roleplay turn. Uses structured outputs (`output_config.format`) to return JSON: `learner_translation`, `corrected_message`, `natural_message` (how a native would phrase it — empty unless meaningfully different from the correction), `notes`, `mistake_tags`, `reply_es`, `reply_en`.
   - `apiOpening({situation, model})` — the AI's in-character first message for a new conversation (just `reply_es` / `reply_en`, no correction fields). Called on start so the learner doesn't face a blank chat.
   - `apiTutor({history, question, transcript, model})` — freeform grammar Q&A side-thread; receives the conversation transcript as context.
@@ -38,7 +38,7 @@ Defined in the `KEYMAP` object in `public/app.js`; rebindable without code chang
 
 ## Settings popover
 
-The ⚙ button in the header opens a popover with all per-user settings (persisted in localStorage, applied immediately): the Anthropic API key (`anthropicApiKey`, required) and ElevenLabs key (`elevenLabsApiKey`, optional — gates the 🔊 buttons), model select, auto-show translations (`autoShowEn`), auto-show notes (`autoShowNotes`), and show session cost (`showCost`, default on — hides the header cost ticker when off). `Esc` or an outside click closes it.
+The ⚙ button in the header opens a popover with all per-user settings (persisted in localStorage, applied immediately): the model select (grouped by provider, built from `getModelOptions()`), per-provider API keys (Anthropic / OpenAI / Gemini, plus the optional ElevenLabs key that gates the 🔊 buttons), a collapsible "Custom OpenAI-compatible endpoint" section (base URL / key / model id), auto-show translations (`autoShowEn`), auto-show notes (`autoShowNotes`), and show session cost (`showCost`, default on — hides the header cost ticker when off). Only the key for the selected model's provider is needed to chat; supplying it (or switching to a model whose provider is already configured) auto-resumes the opening. `Esc` or an outside click closes it.
 
 ## Roadmap (discussed, not yet built)
 

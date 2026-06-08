@@ -628,22 +628,45 @@ function bindKeyInput(id, storageKey, onChange) {
     if (onChange) onChange();
   });
 }
-bindKeyInput("anthropicKey", "anthropicApiKey", () => {
-  // Just supplied a key and the opening never got to run → kick it off now,
-  // so pasting the key makes the conversation appear without a manual retry.
-  if (openingFailed && getAnthropicKey() && !opening) generateOpening();
-});
+// Once the selected model's provider is configured and the opening never got
+// to run, kick it off — so supplying a key/endpoint makes the conversation
+// appear without a manual retry. Also runs when switching to a model whose
+// provider you've already configured.
+function maybeResumeOpening() {
+  if (openingFailed && !opening && hasKeyForModel(model)) generateOpening();
+}
+
+bindKeyInput("anthropicKey", "anthropicApiKey", maybeResumeOpening);
+bindKeyInput("openaiKey", "openaiApiKey", maybeResumeOpening);
+bindKeyInput("geminiKey", "geminiApiKey", maybeResumeOpening);
+bindKeyInput("compatBaseUrl", "compatibleBaseUrl", maybeResumeOpening);
+bindKeyInput("compatKey", "compatibleApiKey", maybeResumeOpening);
+bindKeyInput("compatModel", "compatibleModel", maybeResumeOpening);
 bindKeyInput("elevenLabsKey", "elevenLabsApiKey", applyTtsVisibility);
 
+// Build the model dropdown grouped by provider (options come from api.js).
 const modelSelectEl = $("modelSelect");
+for (const group of getModelOptions()) {
+  const og = document.createElement("optgroup");
+  og.label = group.label;
+  for (const opt of group.options) {
+    const o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    og.appendChild(o);
+  }
+  modelSelectEl.appendChild(og);
+}
 modelSelectEl.value = model;
 if (modelSelectEl.value !== model) {
   // Stored value no longer in the list — fall back to the first option.
   model = modelSelectEl.value || "claude-haiku-4-5";
+  localStorage.setItem("model", model);
 }
 modelSelectEl.addEventListener("change", () => {
   model = modelSelectEl.value;
   localStorage.setItem("model", model);
+  maybeResumeOpening();
 });
 
 const autoShowEnEl = $("autoShowEn");
@@ -759,12 +782,12 @@ $("tutorForm").addEventListener("submit", (e) => {
 
 // ---- Boot ----
 // No start screen: jump straight into a conversation with a random scenario.
-// First-run with no API key: open Settings and focus the key field so the
-// user knows what to do (the scenario still loads; the opening shows an
-// inline "add your key" message that resolves the moment a key is pasted).
+// First-run with no key for the selected model's provider: open Settings so
+// the user knows what to do (the scenario still loads; the opening shows an
+// inline "add your key" message that resolves the moment a key is supplied).
 if (!isDemo) {
   startRandomSession();
-  if (!getAnthropicKey()) {
+  if (!hasKeyForModel(model)) {
     toggleSettings(true);
     $("anthropicKey").focus();
   }

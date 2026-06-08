@@ -1,48 +1,137 @@
 // ---- Direct API layer (client-only) ----
-// This file holds everything that used to live in server.js: the model pricing
-// table, cost computation, system prompts, structured-output schemas, and the
-// calls to Anthropic / ElevenLabs. The app is fully static — each user supplies
-// their own API keys (stored in localStorage, see Settings) and the browser
-// calls the providers directly. No server, nothing persisted server-side.
+// This file holds everything that used to live in server.js: the provider model
+// catalog, cost computation, system prompts, structured-output schemas, and the
+// calls to the AI providers / ElevenLabs. The app is fully static — each user
+// supplies their own API keys (stored in localStorage, see Settings) and the
+// browser calls the providers directly. No server, nothing persisted.
+//
+// Multiple providers are supported through a small adapter layer: every provider
+// implements one `complete({ modelId, system, messages, schema, maxTokens })`
+// function that returns `{ text, usage }`. The neutral message shape is
+// `[{ role: "user"|"assistant", content: string }]` and `system` is a string;
+// each adapter translates that into its provider's request format. The roleplay
+// turns rely on JSON-schema structured output, which every provider here
+// supports (Anthropic output_config, OpenAI response_format, Gemini
+// responseSchema).
 
-// Allowed models with $/Mtok pricing and per-model thinking config
-// (Haiku 4.5 doesn't support adaptive thinking).
-const MODELS = {
-  "claude-opus-4-8": { in: 5, out: 25, thinking: { type: "adaptive" } },
-  "claude-sonnet-4-6": { in: 3, out: 15, thinking: { type: "adaptive" } },
-  "claude-haiku-4-5": { in: 1, out: 5, thinking: null },
+function getKey(name) {
+  return (localStorage.getItem(name) || "").trim();
+}
+// Kept for the TTS helpers below.
+function getElevenLabsKey() {
+  return getKey("elevenLabsApiKey");
+}
+
+// Sentinel model value for the user-configured OpenAI-compatible endpoint
+// (its real model id lives in a settings field, not in any fixed catalog).
+const CUSTOM_MODEL_VALUE = "__custom__";
+
+// Provider catalog. Pricing is $/Mtok. NOTE: only the Anthropic numbers are
+// authoritative; the OpenAI/Gemini prices are approximate (as of 2026-06) and
+// drive only the cost-ticker estimate — update them here if they drift. Model
+// ids must be valid for the provider; add/remove freely.
+const PROVIDERS = {
+  anthropic: {
+    label: "Anthropic",
+    keyName: "anthropicApiKey",
+    models: [
+      { id: "claude-haiku-4-5", label: "Haiku 4.5", in: 1, out: 5 },
+      { id: "claude-sonnet-4-6", label: "Sonnet 4.6", in: 3, out: 15 },
+      { id: "claude-opus-4-8", label: "Opus 4.8", in: 5, out: 25 },
+    ],
+    complete: anthropicComplete,
+  },
+  openai: {
+    label: "OpenAI",
+    keyName: "openaiApiKey",
+    models: [
+      { id: "gpt-4o-mini", label: "GPT-4o mini", in: 0.15, out: 0.6 },
+      { id: "gpt-4.1-mini", label: "GPT-4.1 mini", in: 0.4, out: 1.6 },
+      { id: "gpt-4.1", label: "GPT-4.1", in: 2, out: 8 },
+      { id: "gpt-5-mini", label: "GPT-5 mini", in: 0.25, out: 2 },
+      { id: "gpt-5", label: "GPT-5", in: 1.25, out: 10 },
+    ],
+    complete: openaiComplete,
+  },
+  gemini: {
+    label: "Google Gemini",
+    keyName: "geminiApiKey",
+    models: [
+      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", in: 0.3, out: 2.5 },
+      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", in: 1.25, out: 10 },
+    ],
+    complete: geminiComplete,
+  },
+  compatible: {
+    label: "OpenAI-compatible",
+    keyName: "compatibleApiKey",
+    models: [], // model id + base URL come from settings; see CUSTOM_MODEL_VALUE
+    complete: compatibleComplete,
+  },
 };
+
 const DEFAULT_MODEL = "claude-haiku-4-5";
 
-// ---- API keys (per-user, stored only in this browser) ----
-function getAnthropicKey() {
-  return (localStorage.getItem("anthropicApiKey") || "").trim();
-}
-function getElevenLabsKey() {
-  return (localStorage.getItem("elevenLabsApiKey") || "").trim();
+// Resolve a dropdown value into { providerId, provider, modelId, pricing }.
+// pricing is null for the custom endpoint (cost can't be known).
+function resolveModel(selected) {
+  if (selected === CUSTOM_MODEL_VALUE) {
+    return {
+      providerId: "compatible",
+      provider: PROVIDERS.compatible,
+      modelId: getKey("compatibleModel"),
+      pricing: null,
+    };
+  }
+  for (const [pid, p] of Object.entries(PROVIDERS)) {
+    const m = p.models.find((x) => x.id === selected);
+    if (m) {
+      return { providerId: pid, provider: p, modelId: m.id, pricing: { in: m.in, out: m.out } };
+    }
+  }
+  const p = PROVIDERS.anthropic;
+  const m = p.models.find((x) => x.id === DEFAULT_MODEL);
+  return { providerId: "anthropic", provider: p, modelId: DEFAULT_MODEL, pricing: { in: m.in, out: m.out } };
 }
 
-function resolveModel(name) {
-  return MODELS[name] ? name : DEFAULT_MODEL;
+// Grouped options for building the model <select> (one <optgroup> per provider).
+function getModelOptions() {
+  return Object.entries(PROVIDERS).map(([pid, p]) => ({
+    label: p.label,
+    options:
+      pid === "compatible"
+        ? [{ value: CUSTOM_MODEL_VALUE, label: "Custom (OpenAI-compatible)" }]
+        : p.models.map((m) => ({ value: m.id, label: m.label })),
+  }));
 }
 
-function computeCost(model, usage) {
-  const p = MODELS[model];
+// Is the selected model usable — i.e. is its provider's key (and, for the custom
+// endpoint, the base URL + model id) configured?
+function hasKeyForModel(selected) {
+  const r = resolveModel(selected);
+  if (r.providerId === "compatible") {
+    return Boolean(getKey("compatibleBaseUrl") && getKey("compatibleModel"));
+  }
+  return Boolean(getKey(r.provider.keyName));
+}
+
+function computeCost(pricing, usage) {
   const inTok = usage.input_tokens ?? 0;
   const cacheRead = usage.cache_read_input_tokens ?? 0;
   const cacheWrite = usage.cache_creation_input_tokens ?? 0;
   const outTok = usage.output_tokens ?? 0;
   return (
-    (inTok * p.in + cacheRead * p.in * 0.1 + cacheWrite * p.in * 1.25 + outTok * p.out) / 1e6
+    (inTok * pricing.in + cacheRead * pricing.in * 0.1 + cacheWrite * pricing.in * 1.25 + outTok * pricing.out) / 1e6
   );
 }
 
-function usagePayload(model, usage) {
+function usagePayload(modelId, pricing, usage) {
   return {
-    model,
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
-    cost: computeCost(model, usage),
+    model: modelId,
+    input_tokens: usage.input_tokens ?? 0,
+    output_tokens: usage.output_tokens ?? 0,
+    // Custom endpoints have no known pricing → cost stays 0 (untracked).
+    cost: pricing ? computeCost(pricing, usage) : 0,
   };
 }
 
@@ -140,20 +229,66 @@ ${transcript || "(no conversation yet)"}
 const OPENING_INSTRUCTION =
   "Start the roleplay yourself: greet the learner in character and say one short, simple opening line (1-2 sentences, beginner-friendly) that fits the situation, ending with a question to get the conversation going. Produce only your in-character Spanish line and its English translation.";
 
-// ---- Anthropic Messages API (direct browser call) ----
-// `anthropic-dangerous-direct-browser-access` opts into CORS for browser
-// requests. It's "dangerous" only when you ship YOUR key to browsers — here the
-// key is the user's own, stored locally and sent only to api.anthropic.com.
+// ---- Provider-agnostic entry points ----
 class MissingKeyError extends Error {}
 
-async function anthropicMessages({ model, max_tokens, system, messages, schema }) {
-  const key = getAnthropicKey();
-  if (!key) {
-    throw new MissingKeyError("Add your Anthropic API key in Settings (⚙) to start practicing.");
+async function complete({ model, system, messages, schema, maxTokens }) {
+  const r = resolveModel(model);
+  const out = await r.provider.complete({ modelId: r.modelId, system, messages, schema, maxTokens });
+  return { text: out.text, usage: usagePayload(r.modelId, r.pricing, out.usage) };
+}
+
+async function apiChat({ situation, history = [], message, model }) {
+  const { text, usage } = await complete({
+    model,
+    system: chatSystemPrompt(situation),
+    messages: [...history, { role: "user", content: message }],
+    schema: TURN_SCHEMA,
+    maxTokens: 16000,
+  });
+  const turn = JSON.parse(text);
+  // The model occasionally emits stray backslash artifacts in notes
+  // (e.g. "\\an'" or "\\\\" where an em-dash belongs). Backslashes are never
+  // legitimate in notes text, so drop those tokens.
+  if (turn.notes) {
+    turn.notes = turn.notes.replace(/\\+\S*/g, "").replace(/ {2,}/g, " ").trim();
   }
-  const m = resolveModel(model);
-  const body = { model: m, max_tokens, system, messages };
-  if (MODELS[m].thinking) body.thinking = MODELS[m].thinking;
+  return { ...turn, usage };
+}
+
+async function apiOpening({ situation, model }) {
+  const { text, usage } = await complete({
+    model,
+    system: chatSystemPrompt(situation),
+    messages: [{ role: "user", content: OPENING_INSTRUCTION }],
+    schema: OPENING_SCHEMA,
+    maxTokens: 4000,
+  });
+  return { ...JSON.parse(text), usage };
+}
+
+async function apiTutor({ history = [], question, transcript = "", model }) {
+  const { text, usage } = await complete({
+    model,
+    system: tutorSystemPrompt(transcript),
+    messages: [...history, { role: "user", content: question }],
+    maxTokens: 16000,
+  });
+  return { answer: text, usage };
+}
+
+// ---- Provider adapters ----
+// Each returns { text, usage } with usage carrying { input_tokens, output_tokens }
+// (Anthropic additionally carries cache_* fields, used by computeCost).
+
+// Anthropic Messages API. `anthropic-dangerous-direct-browser-access` opts into
+// CORS for browser requests — safe here because it's the user's own key. Sonnet
+// and Opus use adaptive thinking; Haiku doesn't support it.
+async function anthropicComplete({ modelId, system, messages, schema, maxTokens }) {
+  const key = getKey("anthropicApiKey");
+  if (!key) throw new MissingKeyError("Add your Anthropic API key in Settings (⚙) to use this model.");
+  const body = { model: modelId, max_tokens: maxTokens, system, messages };
+  if (modelId !== "claude-haiku-4-5") body.thinking = { type: "adaptive" };
   if (schema) body.output_config = { format: { type: "json_schema", schema } };
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -167,54 +302,129 @@ async function anthropicMessages({ model, max_tokens, system, messages, schema }
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error?.message || `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(data?.error?.message || `Anthropic request failed (${res.status})`);
+  return { text: data.content?.find((b) => b.type === "text")?.text ?? "", usage: data.usage ?? {} };
+}
+
+// OpenAI Chat Completions. Structured output via response_format json_schema
+// (strict). api.openai.com allows direct browser calls with a user key.
+async function openaiComplete({ modelId, system, messages, schema, maxTokens }) {
+  const key = getKey("openaiApiKey");
+  if (!key) throw new MissingKeyError("Add your OpenAI API key in Settings (⚙) to use this model.");
+  return openaiStyleCall({
+    url: "https://api.openai.com/v1/chat/completions",
+    key,
+    modelId,
+    system,
+    messages,
+    schema,
+    maxTokens,
+    tokenParam: "max_completion_tokens",
+    strict: true,
+    label: "OpenAI",
+  });
+}
+
+// Any OpenAI-compatible endpoint (OpenRouter, Groq, Together, vLLM, Ollama, ...).
+// Base URL + model id come from Settings; the key is optional (local servers
+// often need none). Uses max_tokens (broadest compatibility) and non-strict
+// json_schema since support varies by backend.
+async function compatibleComplete({ modelId, system, messages, schema, maxTokens }) {
+  const base = getKey("compatibleBaseUrl");
+  if (!base) throw new MissingKeyError("Set the custom endpoint's Base URL in Settings (⚙).");
+  if (!modelId) throw new MissingKeyError("Set the custom endpoint's Model id in Settings (⚙).");
+  const url = base.replace(/\/+$/, "") + "/chat/completions";
+  return openaiStyleCall({
+    url,
+    key: getKey("compatibleApiKey"), // optional
+    modelId,
+    system,
+    messages,
+    schema,
+    maxTokens,
+    tokenParam: "max_tokens",
+    strict: false,
+    label: "Endpoint",
+  });
+}
+
+// Shared request/response handling for OpenAI-shaped chat APIs.
+async function openaiStyleCall({ url, key, modelId, system, messages, schema, maxTokens, tokenParam, strict, label }) {
+  const body = {
+    model: modelId,
+    messages: [{ role: "system", content: system }, ...messages],
+    [tokenParam]: maxTokens,
+  };
+  if (schema) {
+    body.response_format = {
+      type: "json_schema",
+      json_schema: { name: "response", ...(strict ? { strict: true } : {}), schema },
+    };
   }
-  return data;
+  const headers = { "Content-Type": "application/json" };
+  if (key) headers.Authorization = `Bearer ${key}`;
+
+  const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || `${label} request failed (${res.status})`);
+  const u = data.usage ?? {};
+  return {
+    text: data.choices?.[0]?.message?.content ?? "",
+    usage: { input_tokens: u.prompt_tokens ?? 0, output_tokens: u.completion_tokens ?? 0 },
+  };
 }
 
-function extractText(data) {
-  return data.content?.find((b) => b.type === "text")?.text ?? "";
-}
-
-async function apiChat({ situation, history = [], message, model }) {
-  const data = await anthropicMessages({
-    model,
-    max_tokens: 16000,
-    system: chatSystemPrompt(situation),
-    messages: [...history, { role: "user", content: message }],
-    schema: TURN_SCHEMA,
-  });
-  const turn = JSON.parse(extractText(data));
-  // The model occasionally emits stray backslash artifacts in notes
-  // (e.g. "\\an'" or "\\\\" where an em-dash belongs). Backslashes are never
-  // legitimate in notes text, so drop those tokens.
-  if (turn.notes) {
-    turn.notes = turn.notes.replace(/\\+\S*/g, "").replace(/ {2,}/g, " ").trim();
+// Google Gemini generateContent. Auth via x-goog-api-key header. Structured
+// output via responseMimeType + responseSchema (Gemini's OpenAPI-subset schema).
+async function geminiComplete({ modelId, system, messages, schema, maxTokens }) {
+  const key = getKey("geminiApiKey");
+  if (!key) throw new MissingKeyError("Add your Google Gemini API key in Settings (⚙) to use this model.");
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: messages.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    })),
+    generationConfig: { maxOutputTokens: maxTokens },
+  };
+  if (schema) {
+    body.generationConfig.responseMimeType = "application/json";
+    body.generationConfig.responseSchema = toGeminiSchema(schema);
   }
-  return { ...turn, usage: usagePayload(resolveModel(model), data.usage) };
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify(body),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || `Gemini request failed (${res.status})`);
+  const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+  const u = data.usageMetadata ?? {};
+  return { text, usage: { input_tokens: u.promptTokenCount ?? 0, output_tokens: u.candidatesTokenCount ?? 0 } };
 }
 
-async function apiOpening({ situation, model }) {
-  const data = await anthropicMessages({
-    model,
-    max_tokens: 4000,
-    system: chatSystemPrompt(situation),
-    messages: [{ role: "user", content: OPENING_INSTRUCTION }],
-    schema: OPENING_SCHEMA,
-  });
-  const opening = JSON.parse(extractText(data));
-  return { ...opening, usage: usagePayload(resolveModel(model), data.usage) };
-}
-
-async function apiTutor({ history = [], question, transcript = "", model }) {
-  const data = await anthropicMessages({
-    model,
-    max_tokens: 16000,
-    system: tutorSystemPrompt(transcript),
-    messages: [...history, { role: "user", content: question }],
-  });
-  return { answer: extractText(data), usage: usagePayload(resolveModel(model), data.usage) };
+// Convert our JSON Schema to Gemini's schema dialect: uppercase type enums, drop
+// additionalProperties (unsupported), and pin field order via propertyOrdering.
+function toGeminiSchema(s) {
+  const TYPE = {
+    object: "OBJECT", string: "STRING", number: "NUMBER",
+    integer: "INTEGER", boolean: "BOOLEAN", array: "ARRAY",
+  };
+  const out = {};
+  if (s.type) out.type = TYPE[s.type] || String(s.type).toUpperCase();
+  if (s.description) out.description = s.description;
+  if (s.enum) out.enum = s.enum;
+  if (s.properties) {
+    out.properties = {};
+    for (const k of Object.keys(s.properties)) out.properties[k] = toGeminiSchema(s.properties[k]);
+    out.propertyOrdering = Object.keys(s.properties);
+  }
+  if (s.required) out.required = s.required;
+  if (s.items) out.items = toGeminiSchema(s.items);
+  return out;
 }
 
 // ---- Text-to-speech (ElevenLabs, direct browser call) ----
