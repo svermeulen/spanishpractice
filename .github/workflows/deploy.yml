@@ -18,6 +18,12 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# The official Pages actions still ship on their Node 20 runtime, which GitHub
+# is deprecating. Opt every JS action in this workflow into the Node 24 runtime
+# now to silence the deprecation warning (per GitHub's migration guidance).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
