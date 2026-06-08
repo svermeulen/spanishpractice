@@ -9,6 +9,35 @@ It's free and runs **entirely in your browser** — there's no server. You bring
 your own AI API key; it's stored only on your device and sent straight to the
 provider you choose. Nothing is logged or proxied.
 
+## Is this safe? (your API keys)
+
+Fair question — here's the honest version.
+
+**Where your key goes.** It's saved only in this browser's `localStorage` and
+sent directly to your provider over HTTPS. There's no backend, no analytics, no
+third-party scripts, and no dependencies — so there's literally nowhere else for
+a key to go. The whole app is open-source static files; you can read them, diff
+the deployed site against this repo, or just [run it yourself](#run-it-locally).
+
+**The worst case is smaller than it sounds.** An API key is *not* an account
+password: a leaked key can't log in, change your password, see your billing, or
+touch your other accounts. The realistic worst case is someone running up
+usage charges on that one key — and you can **revoke it with one click** in the
+provider console the moment anything looks off.
+
+**Cap the downside in 30 seconds.** Before pasting a key:
+
+- **Set a spending limit** on it (or on the account). This bounds the worst case
+  to a number you choose.
+- **Create a dedicated key** just for this app, so it's easy to monitor and
+  revoke without affecting anything else.
+- **Restrict it** where your provider allows: Google/Gemini keys can be locked
+  to the site (HTTP-referrer restriction) and to the Generative Language API;
+  OpenAI keys can be project-scoped with limited permissions.
+
+**Still cautious?** Run it locally (below) — then no one but you ever serves the
+code, and the operator-trust question disappears entirely.
+
 ## Features
 
 - **Roleplay chat** — the AI plays a scenario partner (waiter, shopkeeper, new
