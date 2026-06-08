@@ -1,4 +1,4 @@
-# Spanish Converser
+# Spanish Practice
 
 Client-only web app for practicing Spanish through AI roleplay conversations. Fully static — there is no server. Each user supplies their own API keys (stored in their browser's localStorage) and the page calls the AI provider / ElevenLabs directly. Supports Anthropic, OpenAI, Google Gemini, and any OpenAI-compatible endpoint (OpenRouter, Groq, local servers, ...) — picked via the model dropdown. Deployed as a static site (GitHub Pages); also runnable locally as plain static files.
 
@@ -10,7 +10,7 @@ npm start            # serves public/ at http://localhost:3000 (python3 -m http.
 
 No build step and no dependencies needed to run the app — `npm start` just serves the static `public/` folder. Open the app, click ⚙ Settings, pick a model, and paste the API key for that model's provider (Anthropic / OpenAI / Gemini, or a custom endpoint); optionally add an ElevenLabs key (enables 🔊 audio). Keys live only in the browser and are sent directly to the providers.
 
-Deploy: pushing to `main` publishes `public/` to GitHub Pages via `.github/workflows/deploy.yml` (enable Pages once: Settings → Pages → Source: GitHub Actions).
+Deploy: pushing to `main` publishes `public/` to GitHub Pages via `.github/workflows/deploy.yml` (enable Pages once: Settings → Pages → Source: GitHub Actions). Served at the custom domain **spanishpractice.app** (the Pages `cname`, also asserted by `public/CNAME`); DNS is managed in Cloudflare (CNAME-flattened apex → `svermeulen.github.io`). The fallback Pages URL is `svermeulen.github.io/spanish-converser/`.
 
 The only thing that needs Node/npm is regenerating the scenario deck — `npm install` then `npm run generate-scenarios` (uses `@anthropic-ai/sdk`, a devDependency, with `ANTHROPIC_API_KEY` in the env).
 
@@ -25,7 +25,8 @@ The only thing that needs Node/npm is regenerating the scenario deck — `npm in
   - There is no start screen: on load the client picks a random scenario from `public/scenarios.json` (100 pre-generated) and immediately starts a conversation. A 🎲 button next to the situation (and `⌘K`) clears the conversation and restarts with a new random scenario. The deck is shuffled and a cursor persisted in localStorage so nothing repeats until exhausted. Regenerate the list with `node scripts/generate-scenarios.mjs`. Each scenario is a `{learner, ai}` pair: `learner` is the learner-facing description shown in the header (prefixed "Situation: "), `ai` is the AI partner's persona sent to the prompt (hidden from the UI). `normalizeScenario` in `app.js` also accepts a plain string by using it for both fields.
   - 🔊 buttons (teacher replies, corrected sentence, "More natural" line) play TTS on demand; ⌥click plays at 0.8× speed. The client caches object URLs per text+speed; starting a clip stops the previous one.
   - The correction diff is computed client-side (`wordDiff` in `app.js`): accent-insensitive word-level LCS. Exact matches render plain, accent-only differences render as a soft amber highlight (learner's keyboard has no accents — not treated as errors), real changes render as red strikethrough / green insertion.
-- Conversation state lives only in the browser for the duration of a session; nothing is persisted (no session files, no mistake log) — there is no server. Reloading or randomizing discards the current conversation. Assistant turns are sent in history as `reply_es` only (not the full JSON). On first load no model is chosen, so Settings opens automatically (focused on the model picker) and the opening shows a "choose a model" message; once a model is picked and its provider key supplied, the opening resumes without a manual retry (`openingFailed` + `maybeResumeOpening` in `app.js`).
+- Conversation state lives only in the browser for the duration of a session; nothing is persisted (no session files, no mistake log) — there is no server. Reloading or randomizing discards the current conversation. Assistant turns are sent in history as `reply_es` only (not the full JSON).
+- First run shows the **onboarding modal** (`#onboarding` in `index.html`, wired in the "Onboarding modal" section of `app.js`): it explains the app + bring-your-own-key/client-side model, collects a provider + key, picks that provider's cheapest model (`firstModelForProvider` — Haiku / gpt-4o-mini / Gemini Flash / the custom sentinel), writes everything to localStorage + reflects it into the Settings inputs (`syncSettingsInputs`), and starts the conversation. Returning users (a usable model+key already stored) skip it. Closing the modal (×) drops into Settings as an escape hatch. The opening fires via `generateOpening()`, which self-guards on session+model+key+in-flight state (`openingInFlight`), so it runs exactly once and resumes automatically when config arrives (`maybeResumeOpening`).
 
 ## Keyboard shortcuts
 
