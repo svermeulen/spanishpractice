@@ -54,6 +54,10 @@ code, and the operator-trust question disappears entirely.
   free browser voices, or higher-quality **OpenAI / Google Gemini / ElevenLabs**
   — the first two reuse the same key as chat, so no extra signup. Voices are
   gender-matched to the scenario.
+- **Scene backgrounds** (optional) — turn on image generation in Settings →
+  Visuals to render a blurred photo of each situation behind the chat. One image
+  per scenario (not per message) keeps it cheap (~$0.005–0.02), and it reuses
+  your OpenAI or Gemini key.
 - **Voice input** — where the browser supports it, flip the composer into voice
   mode and tap to talk: speak your reply in Spanish, tap again to stop, and it
   transcribes and sends automatically (`⌘⇧M` toggles recording).

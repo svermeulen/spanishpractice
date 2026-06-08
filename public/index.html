@@ -39,6 +39,10 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="no-tts">
+  <!-- Optional AI-generated scene backdrop (blurred, behind everything). Shown
+       only when an image backend is enabled; body.has-scene frosts the UI. -->
+  <div id="sceneBg" class="scene-bg" aria-hidden="true"></div>
+
   <!-- Main app -->
   <div id="main" class="main">
     <header>
@@ -63,6 +67,7 @@
                 <button class="settings-tab" type="button" data-tab="personalization" role="tab" aria-selected="false">Personalization</button>
                 <button class="settings-tab" type="button" data-tab="model" role="tab" aria-selected="false">AI Model</button>
                 <button class="settings-tab" type="button" data-tab="audio" role="tab" aria-selected="false">Audio</button>
+                <button class="settings-tab" type="button" data-tab="visuals" role="tab" aria-selected="false">Visuals</button>
               </div>
 
               <div class="settings-panel" id="tab-general" role="tabpanel">
@@ -166,6 +171,15 @@
                   <p class="settings-note">Choose “Custom (OpenAI-compatible)” in the model list to use this. Works with OpenRouter, Groq, Together, etc. Local servers (Ollama / LM Studio) only work when this page is opened over <code>http://</code> — a hosted <code>https</code> page can't call <code>http://localhost</code> (mixed content). Cost isn't tracked for custom endpoints.</p>
                 </details>
                 <p class="settings-note">Keys are stored only in this browser and sent directly to each provider — never to any server. Tip: use keys with a spending limit.</p>
+              </div>
+
+              <div class="settings-panel hidden" id="tab-visuals" role="tabpanel">
+                <label class="setting setting-row">
+                  <span>Scene background</span>
+                  <select id="imageBackendSelect"></select>
+                </label>
+                <p class="settings-note" id="imageBackendNote"></p>
+                <p class="settings-note">Generates one blurred image of the situation behind the chat, refreshed when you start a new situation (🎲) — not every message, to keep cost low. Reuses your OpenAI / Gemini key. Roughly $0.005 (OpenAI) – $0.02 (Gemini) per situation; tracked in the cost ticker.</p>
               </div>
             </div>
           </div>

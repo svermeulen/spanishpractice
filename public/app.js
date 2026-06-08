@@ -634,10 +634,58 @@ function resetSessionState() {
   transcript = [];
   resetUsage();
   resetAudio();
+  sceneDescription = "";
+  sceneImageInFlight = false;
+  clearSceneImage();
   chatMessagesEl.innerHTML = "";
   tutorMessagesEl.innerHTML = "";
   addTutorIntro();
   syncSendButton(); // no opening yet → Send disabled, but the input stays typeable
+}
+
+// ---- Scene background image ----
+// When an image backend is enabled (Visuals settings), each scenario renders a
+// blurred establishing photo of its setting behind the UI. Per-scenario only —
+// fired when a situation starts, never per message — so cost stays low. It's
+// best-effort eye-candy: any failure silently keeps the solid background.
+let sceneDescription = ""; // text fed to the image model (image_prompt / situation)
+let sceneImageUrl = null; // current object URL, revoked when replaced/cleared
+let sceneImageInFlight = false;
+
+function clearSceneImage() {
+  document.body.classList.remove("has-scene");
+  const bg = $("sceneBg");
+  bg.classList.remove("ready");
+  bg.style.backgroundImage = "";
+  if (sceneImageUrl) {
+    URL.revokeObjectURL(sceneImageUrl);
+    sceneImageUrl = null;
+  }
+}
+
+function applySceneImage(url) {
+  const bg = $("sceneBg");
+  if (sceneImageUrl) URL.revokeObjectURL(sceneImageUrl);
+  sceneImageUrl = url;
+  bg.style.backgroundImage = `url("${url}")`;
+  document.body.classList.add("has-scene");
+  requestAnimationFrame(() => bg.classList.add("ready")); // let the fade transition run
+}
+
+async function generateSceneImage() {
+  if (!imageAvailable() || !sceneDescription || sceneImageInFlight) return;
+  sceneImageInFlight = true;
+  const mySession = sessionId; // bail if a newer session supersedes us mid-flight
+  try {
+    const { blob, usage } = await apiImage({ scene: sceneDescription });
+    if (mySession !== sessionId) return; // session reset while we awaited — discard
+    applySceneImage(URL.createObjectURL(blob));
+    trackUsage(usage);
+  } catch {
+    // Best-effort: keep the plain background on refusal / error / no key.
+  } finally {
+    if (mySession === sessionId) sceneImageInFlight = false;
+  }
 }
 
 // Start a session from a known scenario (typed situation or demo).
@@ -647,10 +695,14 @@ function startSession(scenario) {
   const sc = normalizeScenario(scenario);
   situation = sc.ai;
   situationDisplay = sc.learner;
+  sceneDescription = sc.ai || sc.learner; // typed situations have no image_prompt
   showMain();
   // Have the AI open the conversation in character (skipped in demo mode, and
   // a no-op until a model+key is configured — generateOpening guards on that).
-  if (!isDemo) generateOpening();
+  if (!isDemo) {
+    generateOpening();
+    generateSceneImage();
+  }
 }
 
 // ---- Dynamic scenarios ----
@@ -682,8 +734,10 @@ async function startRandomSession() {
     situation = sc.ai;
     situationDisplay = sc.learner;
     voiceGender = sc.voice_gender || null;
+    sceneDescription = sc.image_prompt || sc.learner || sc.ai;
     renderSituationLabel();
     generateOpening(); // takes over the Send-button state from here
+    generateSceneImage(); // async backdrop, fades in behind the chat
   } catch (err) {
     if (mySession !== sessionId) return;
     thinking.remove();
@@ -1185,6 +1239,40 @@ ttsBackendSelectEl.addEventListener("change", () => {
 });
 applyAudioState();
 
+// Scene-background image backend: Off (default) / OpenAI / Gemini. Reuses the
+// chosen provider's chat key (no separate field). The note reminds the user when
+// the matching key is missing so the toggle doesn't look broken.
+function applyImageState() {
+  const note = $("imageBackendNote");
+  const backend = imageBackend();
+  if (backend === "none") {
+    note.classList.add("hidden");
+  } else if (imageAvailable()) {
+    note.textContent = backend === "openai"
+      ? "Using your OpenAI key — the same one as OpenAI chat models."
+      : "Using your Gemini key — the same one as Gemini chat models.";
+    note.classList.remove("hidden");
+  } else {
+    note.textContent = `No ${backend === "openai" ? "OpenAI" : "Gemini"} key set yet — add it on the AI Model tab to enable scene backgrounds.`;
+    note.classList.remove("hidden");
+  }
+}
+const imageBackendSelectEl = $("imageBackendSelect");
+for (const b of IMAGE_BACKENDS) {
+  const o = document.createElement("option");
+  o.value = b.value;
+  o.textContent = b.label;
+  imageBackendSelectEl.appendChild(o);
+}
+imageBackendSelectEl.value = imageBackend();
+imageBackendSelectEl.addEventListener("change", () => {
+  localStorage.setItem("imageBackend", imageBackendSelectEl.value);
+  applyImageState();
+  if (imageBackend() === "none") clearSceneImage();
+  else generateSceneImage(); // turning it on mid-session backfills the current scene
+});
+applyImageState();
+
 // Strict accent/punctuation checking. Applies to subsequent messages — past
 // corrections were generated (and diffed) under the previous policy, so they're
 // left as-is rather than retroactively re-judged.
@@ -1209,8 +1297,10 @@ function showSettingsTab(name) {
   $("tab-personalization").classList.toggle("hidden", name !== "personalization");
   $("tab-model").classList.toggle("hidden", name !== "model");
   $("tab-audio").classList.toggle("hidden", name !== "audio");
+  $("tab-visuals").classList.toggle("hidden", name !== "visuals");
   syncSettingsInputs();
   applyAudioState();
+  applyImageState();
 }
 settingsTabs.forEach((t) => t.addEventListener("click", () => showSettingsTab(t.dataset.tab)));
 
@@ -1604,6 +1694,7 @@ function saveSession() {
         situation,
         situationDisplay,
         voiceGender,
+        sceneDescription,
         opening,
         turns,
         tutorTurns,
@@ -1638,6 +1729,7 @@ function restoreSession() {
   situation = snap.situation;
   situationDisplay = snap.situationDisplay || "";
   voiceGender = snap.voiceGender || null;
+  sceneDescription = snap.sceneDescription || snap.situationDisplay || "";
   opening = snap.opening;
 
   addTeacherMessage(opening);
@@ -1670,6 +1762,7 @@ function restoreSession() {
   restoring = false;
   syncSendButton(); // restored conversation is ready → Send enabled
   showMain();
+  generateSceneImage(); // re-render the backdrop (the image itself isn't stored)
   return true;
 }
 

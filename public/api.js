@@ -487,8 +487,13 @@ const SCENARIO_SCHEMA = {
       description:
         "The gender of the AI roleplay partner, so a matching voice can be chosen for audio. Pick whichever fits the persona; for an ambiguous role, just pick one.",
     },
+    image_prompt: {
+      type: "string",
+      description:
+        "A short third-person visual description of the physical SETTING only (the place, atmosphere, time of day) for a text-to-image generator to render as a background. No people, no dialogue, no second-person; e.g. \"A warm, bustling traditional tapas bar in Madrid at lunchtime, wooden bar, hanging hams, soft afternoon light.\"",
+    },
   },
-  required: ["learner", "ai", "voice_gender"],
+  required: ["learner", "ai", "voice_gender", "image_prompt"],
   additionalProperties: false,
 };
 
@@ -502,9 +507,10 @@ function scenarioSystemPrompt(level = DEFAULT_LEVEL, region = DEFAULT_REGION, co
 - "learner": shown to the learner in a small header, so keep it SHORT — one concise sentence (roughly 8–16 words) naming the situation and the LEARNER's own role, addressed as "You". Do not describe the AI partner.
 - "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". This can be as long as is genuinely helpful (1–3 sentences). Match the complexity to the learner's level.
 - "voice_gender": "male" or "female" — the AI partner's gender, so a matching voice can be picked for audio.
+- "image_prompt": a short third-person description of the physical SETTING only (place, atmosphere, time of day) for a background image generator — no people, no second-person, no dialogue.
 
 Example:
-{"learner":"You're ordering lunch at a traditional restaurant and asking the waiter for a recommendation.","ai":"A traditional local restaurant. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male"}${ctxBlock}`;
+{"learner":"You're ordering lunch at a traditional restaurant and asking the waiter for a recommendation.","ai":"A traditional local restaurant. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male","image_prompt":"A warm, bustling traditional restaurant interior at lunchtime, wooden tables and soft daylight through tall windows."}${ctxBlock}`;
 }
 
 const SCENARIO_THEMES = [
@@ -847,4 +853,99 @@ function pcmBase64ToWavBlob(b64, sampleRate) {
   str(36, "data"); view.setUint32(40, pcm.length, true);
   new Uint8Array(buf, 44).set(pcm);
   return new Blob([buf], { type: "audio/wav" });
+}
+
+// ---- Image generation (scene backgrounds) ----
+// A roleplay's setting can be rendered as a blurred background image. Like TTS,
+// the backend is an explicit user choice that REUSES the chat provider's key and
+// calls the provider directly from the browser (CORS already proven for chat /
+// TTS on these same hosts). Generated once per scenario — not per message — so
+// cost stays low. "none" (default) is off; only OpenAI and Gemini can do images
+// (Anthropic can't, so Anthropic-only users have no image backend, like TTS).
+const IMAGE_BACKENDS = [
+  { value: "none", label: "Off" },
+  { value: "openai", label: "OpenAI (gpt-image-1-mini)" },
+  { value: "gemini", label: "Google Gemini (Imagen 4 Fast)" },
+];
+// Approximate $/image for the cost ticker — low-quality 1024² (OpenAI) / one
+// Imagen 4 Fast image (Gemini). Order-of-magnitude only; update if they drift.
+const IMAGE_PRICES = { openai: 0.005, gemini: 0.02 };
+
+function imageBackend() {
+  const stored = localStorage.getItem("imageBackend");
+  return ["none", "openai", "gemini"].includes(stored) ? stored : "none";
+}
+// localStorage key holding the API key for the selected image backend (null off).
+function imageBackendKeyName(backend = imageBackend()) {
+  return { openai: "openaiApiKey", gemini: "geminiApiKey" }[backend] || null;
+}
+// Images are available when a backend is chosen and its (chat) key is present.
+function imageAvailable() {
+  const keyName = imageBackendKeyName();
+  return keyName ? Boolean(getKey(keyName)) : false;
+}
+
+// Wrap a raw scene description in styling that yields a legible backdrop: a wide
+// establishing shot, nothing crowding the foreground, and no readable text
+// (image models render garbled lettering that looks bad behind real UI text).
+function buildImagePrompt(scene) {
+  return `A photorealistic, atmospheric wide establishing shot of this setting: ${scene}. Natural lighting, cinematic depth of field, no people in the foreground, and absolutely no readable text, words, letters, or signs. Composed to sit softly blurred behind on-screen text.`;
+}
+
+// Dispatch to the selected backend → { blob, usage }. "none" never reaches here.
+async function apiImage({ scene }) {
+  if (!scene || typeof scene !== "string") throw new Error("scene is required");
+  const backend = imageBackend();
+  const prompt = buildImagePrompt(scene.slice(0, 700));
+  let blob;
+  if (backend === "openai") blob = await openaiImage(prompt);
+  else if (backend === "gemini") blob = await geminiImage(prompt);
+  else throw new Error("No image backend selected.");
+  return { blob, usage: { cost: IMAGE_PRICES[backend] || 0, input_tokens: 0, output_tokens: 0 } };
+}
+
+// OpenAI /v1/images/generations (reuses the OpenAI key). Low quality keeps it
+// cheap (~$0.005) and faster; gpt-image-1* always returns b64_json, so there's
+// no second cross-origin fetch to an image CDN.
+async function openaiImage(prompt) {
+  const key = getKey("openaiApiKey");
+  if (!key) throw new Error("Add your OpenAI API key in Settings.");
+  const res = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "gpt-image-1-mini", prompt, size: "1024x1024", quality: "low", n: 1 }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || `OpenAI image failed (${res.status})`);
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error("OpenAI returned no image.");
+  return base64ToBlob(b64, "image/png");
+}
+
+// Google Imagen 4 Fast via the Gemini API :predict endpoint (reuses the Gemini
+// key). Returns base64 image bytes; 16:9 suits a full-width backdrop.
+async function geminiImage(prompt) {
+  const key = getKey("geminiApiKey");
+  if (!key) throw new Error("Add your Google Gemini API key in Settings.");
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ instances: [{ prompt }], parameters: { sampleCount: 1, aspectRatio: "16:9" } }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || `Gemini image failed (${res.status})`);
+  const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+  if (!b64) throw new Error("Gemini returned no image.");
+  return base64ToBlob(b64, "image/png");
+}
+
+// Decode a base64 image payload into a Blob (so app.js can make an object URL).
+function base64ToBlob(b64, type) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type });
 }
