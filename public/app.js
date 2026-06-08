@@ -3,7 +3,7 @@ const isDemo = new URLSearchParams(location.search).has("demo");
 let autoShowEn = localStorage.getItem("autoShowEn") === "true";
 let autoShowNotes = localStorage.getItem("autoShowNotes") === "true";
 let showCost = localStorage.getItem("showCost") !== "false"; // shown by default
-let model = localStorage.getItem("model") || "claude-opus-4-8";
+let model = localStorage.getItem("model") || "claude-haiku-4-5";
 let sessionCost = 0;
 let sessionTokens = { in: 0, out: 0 };
 let situation = ""; // AI-facing role/persona — sent to the prompt, hidden from the UI
@@ -639,7 +639,7 @@ const modelSelectEl = $("modelSelect");
 modelSelectEl.value = model;
 if (modelSelectEl.value !== model) {
   // Stored value no longer in the list — fall back to the first option.
-  model = modelSelectEl.value || "claude-opus-4-8";
+  model = modelSelectEl.value || "claude-haiku-4-5";
 }
 modelSelectEl.addEventListener("change", () => {
   model = modelSelectEl.value;

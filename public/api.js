@@ -12,7 +12,7 @@ const MODELS = {
   "claude-sonnet-4-6": { in: 3, out: 15, thinking: { type: "adaptive" } },
   "claude-haiku-4-5": { in: 1, out: 5, thinking: null },
 };
-const DEFAULT_MODEL = "claude-opus-4-8";
+const DEFAULT_MODEL = "claude-haiku-4-5";
 
 // ---- API keys (per-user, stored only in this browser) ----
 function getAnthropicKey() {
