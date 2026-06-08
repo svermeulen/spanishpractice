@@ -122,7 +122,8 @@ button { font-family: inherit; }
    frost's blur radius is the Background-blur slider (--scene-blur): 0 = clear
    glass (sharp photo), higher = more blur. */
 body.has-scene { background: transparent; }
-body.has-scene header,
+/* The header stays opaque (it reads badly over busy photos); only the panes
+   frost. */
 body.has-scene .pane {
   background: color-mix(in srgb, var(--pane-bg) 46%, transparent);
   -webkit-backdrop-filter: blur(var(--scene-blur, 6px)) saturate(1.2);
@@ -130,6 +131,21 @@ body.has-scene .pane {
 }
 body.has-scene .tutor-pane {
   background: color-mix(in srgb, var(--pane-alt) 46%, transparent);
+}
+/* Over a scene photo, give floating text its own backing so it stays readable.
+   (Message bubbles and the correction box already have solid backgrounds; these
+   are the bits that otherwise sit straight on the translucent pane.) */
+body.has-scene .reply-meta {
+  width: fit-content;
+  max-width: 100%;
+  background: color-mix(in srgb, var(--pane-bg) 88%, transparent);
+  padding: 5px 11px;
+  border-radius: 12px;
+}
+body.has-scene .tutor-title {
+  background: color-mix(in srgb, var(--pane-bg) 88%, transparent);
+  padding: 3px 9px;
+  border-radius: 7px;
 }
 
 /* ---- Main layout ---- */
@@ -430,7 +446,7 @@ body.resizing { user-select: none; cursor: col-resize; }
   padding: 2px 8px;
   font-size: 14px;
   line-height: 1;
-  background: transparent;
+  background: var(--pane-bg);
   border: 1px solid var(--border);
   border-radius: 7px;
   cursor: pointer;
@@ -519,7 +535,7 @@ body.resizing { user-select: none; cursor: col-resize; }
   padding: 0 13px;
   font-size: 17px;
   line-height: 1;
-  background: transparent;
+  background: var(--pane-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
   cursor: pointer;

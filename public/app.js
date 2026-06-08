@@ -377,7 +377,7 @@ function addTeacherMessage(turn) {
   const msg = addEl(chatMessagesEl, "div", "msg teacher");
   const bubble = addEl(msg, "div", "bubble", turn.reply_es);
   const speakBtn = addSpeakButton(bubble, () => turn.reply_es);
-  const wrap = addEl(msg, "div");
+  const wrap = addEl(msg, "div", "reply-meta");
   const toggle = addEl(wrap, "span", "en-toggle", "EN ▾");
   attachTooltip(toggle, () => EN_TIP, { delay: 350 });
   const body = addEl(wrap, "div", "en-body", turn.reply_en);
