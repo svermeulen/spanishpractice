@@ -1275,8 +1275,8 @@ applyImageState();
 
 // Scene-background blur amount (px). Drives the --scene-blur CSS var live as the
 // slider drags; persisted so the backdrop reads the same on reload.
-let sceneBlur = parseInt(localStorage.getItem("sceneBlur") ?? "3", 10);
-if (!Number.isFinite(sceneBlur)) sceneBlur = 3;
+let sceneBlur = parseInt(localStorage.getItem("sceneBlur") ?? "0", 10);
+if (!Number.isFinite(sceneBlur)) sceneBlur = 0;
 function applySceneBlur() {
   // Drives the frosted panes' backdrop-filter radius (see .scene-bg in CSS).
   document.documentElement.style.setProperty("--scene-blur", `${sceneBlur}px`);
@@ -1678,6 +1678,13 @@ function startFromOnboarding() {
   level = onbLevelEl.value;
   localStorage.setItem("level", level);
   levelSelectEl.value = level;
+  // A Gemini key unlocks cheap image backgrounds (Imagen 4 Fast), so turn scene
+  // visuals on by default for new Gemini users — unless one's already chosen.
+  if (pid === "gemini" && imageBackend() === "none") {
+    localStorage.setItem("imageBackend", "gemini");
+    imageBackendSelectEl.value = "gemini";
+    applyImageState();
+  }
   syncSettingsInputs();
   applyProviderVisibility();
   applyTtsVisibility();
