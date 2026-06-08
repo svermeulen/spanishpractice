@@ -885,18 +885,40 @@ function imageAvailable() {
   return keyName ? Boolean(getKey(keyName)) : false;
 }
 
-// Wrap a raw scene description in styling that yields a legible backdrop: a wide
-// establishing shot, nothing crowding the foreground, and no readable text
-// (image models render garbled lettering that looks bad behind real UI text).
-function buildImagePrompt(scene) {
-  return `A photorealistic, atmospheric wide establishing shot of this setting: ${scene}. Natural lighting, cinematic depth of field, no people in the foreground, and absolutely no readable text, words, letters, or signs. Composed to sit softly blurred behind on-screen text.`;
+// Art styles for the scene background. Each `prompt` fragment is the lead-in
+// medium descriptor; `buildImagePrompt` keeps the composition constraints
+// (establishing shot, no foreground people, no text) constant across styles.
+const IMAGE_STYLES = {
+  photo: { label: "Photographic", prompt: "A photorealistic, atmospheric photograph" },
+  watercolor: { label: "Watercolor", prompt: "A soft, loose watercolor painting" },
+  oil: { label: "Oil painting", prompt: "A richly textured oil painting" },
+  anime: { label: "Anime", prompt: "A lush, painterly anime / Studio-Ghibli-style illustration" },
+  storybook: { label: "Storybook", prompt: "A warm, whimsical children's-storybook illustration" },
+  flat: { label: "Flat vector", prompt: "A clean, modern flat-vector illustration with simple shapes and flat colors" },
+  pixel: { label: "Pixel art", prompt: "Detailed retro 16-bit pixel art" },
+  poster: { label: "Travel poster", prompt: "A vintage mid-century travel-poster illustration" },
+};
+const DEFAULT_IMAGE_STYLE = "photo";
+function getImageStyle(id) {
+  return IMAGE_STYLES[id] || IMAGE_STYLES[DEFAULT_IMAGE_STYLE];
+}
+function getImageStyleOptions() {
+  return Object.entries(IMAGE_STYLES).map(([value, s]) => ({ value, label: s.label }));
+}
+
+// Wrap a raw scene description in the chosen style plus styling that yields a
+// legible backdrop: a wide establishing shot, nothing crowding the foreground,
+// and no readable text (image models render garbled lettering that looks bad
+// behind real UI text).
+function buildImagePrompt(scene, style = DEFAULT_IMAGE_STYLE) {
+  return `${getImageStyle(style).prompt} — a wide establishing shot of this setting: ${scene}. No people in the foreground, and absolutely no readable text, words, letters, or signs. Composed to sit softly behind on-screen text.`;
 }
 
 // Dispatch to the selected backend → { blob, usage }. "none" never reaches here.
-async function apiImage({ scene }) {
+async function apiImage({ scene, style = DEFAULT_IMAGE_STYLE }) {
   if (!scene || typeof scene !== "string") throw new Error("scene is required");
   const backend = imageBackend();
-  const prompt = buildImagePrompt(scene.slice(0, 700));
+  const prompt = buildImagePrompt(scene.slice(0, 700), style);
   let blob;
   if (backend === "openai") blob = await openaiImage(prompt);
   else if (backend === "gemini") blob = await geminiImage(prompt);

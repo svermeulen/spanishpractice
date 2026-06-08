@@ -8,6 +8,7 @@ let checkAccents = localStorage.getItem("checkAccents") === "true"; // off by de
 let model = localStorage.getItem("model") || ""; // "" = no model chosen yet
 let level = localStorage.getItem("level") || DEFAULT_LEVEL; // CEFR difficulty (A1–B2)
 let region = localStorage.getItem("region") || DEFAULT_REGION; // Spanish variety (dialect)
+let imageStyle = localStorage.getItem("imageStyle") || DEFAULT_IMAGE_STYLE; // scene-image art style
 let scenarioContext = localStorage.getItem("scenarioContext") || ""; // learner detail for scenario generation
 let customInstructions = localStorage.getItem("customInstructions") || ""; // free-text tone/behaviour tweak for the partner
 let voiceGender = null; // "male"|"female" from the scenario — matches the TTS voice
@@ -677,7 +678,7 @@ async function generateSceneImage() {
   sceneImageInFlight = true;
   const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   try {
-    const { blob, usage } = await apiImage({ scene: sceneDescription });
+    const { blob, usage } = await apiImage({ scene: sceneDescription, style: imageStyle });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     applySceneImage(URL.createObjectURL(blob));
     trackUsage(usage);
@@ -1245,6 +1246,7 @@ applyAudioState();
 function applyImageState() {
   const note = $("imageBackendNote");
   const backend = imageBackend();
+  $("imageStyleRow").classList.toggle("hidden", backend === "none");
   if (backend === "none") {
     note.classList.add("hidden");
   } else if (imageAvailable()) {
@@ -1270,6 +1272,23 @@ imageBackendSelectEl.addEventListener("change", () => {
   applyImageState();
   if (imageBackend() === "none") clearSceneImage();
   else generateSceneImage(); // turning it on mid-session backfills the current scene
+});
+
+// Image art style (photographic / watercolor / anime / …). Changing it re-renders
+// the current scene in the new style (costs one image).
+const imageStyleSelectEl = $("imageStyleSelect");
+for (const s of getImageStyleOptions()) {
+  const o = document.createElement("option");
+  o.value = s.value;
+  o.textContent = s.label;
+  imageStyleSelectEl.appendChild(o);
+}
+if (!getImageStyleOptions().some((s) => s.value === imageStyle)) imageStyle = DEFAULT_IMAGE_STYLE;
+imageStyleSelectEl.value = imageStyle;
+imageStyleSelectEl.addEventListener("change", () => {
+  imageStyle = imageStyleSelectEl.value;
+  localStorage.setItem("imageStyle", imageStyle);
+  if (imageBackend() !== "none") generateSceneImage();
 });
 applyImageState();
 
