@@ -104,8 +104,8 @@ button { font-family: inherit; }
   z-index: -1; /* above the page canvas, below all in-flow content */
   background-size: cover;
   background-position: center;
-  filter: blur(var(--scene-blur, 3px));
-  transform: scale(1.08); /* slight overscan to hide the soft blurred edges */
+  /* The image itself stays sharp — the perceived blur is the frosted panes in
+     front of it (their backdrop-filter), which is what the slider drives. */
   opacity: 0;
   transition: opacity 0.8s ease;
   pointer-events: none;
@@ -118,13 +118,15 @@ button { font-family: inherit; }
   background: var(--scene-scrim);
 }
 /* When a scene is shown, the canvas goes transparent and the solid surfaces
-   become frosted glass so the photo reads through without hurting text. */
+   become frosted glass so the photo reads through without hurting text. The
+   frost's blur radius is the Background-blur slider (--scene-blur): 0 = clear
+   glass (sharp photo), higher = more blur. */
 body.has-scene { background: transparent; }
 body.has-scene header,
 body.has-scene .pane {
   background: color-mix(in srgb, var(--pane-bg) 68%, transparent);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--scene-blur, 6px)) saturate(1.2);
+  backdrop-filter: blur(var(--scene-blur, 6px)) saturate(1.2);
 }
 body.has-scene .tutor-pane {
   background: color-mix(in srgb, var(--pane-alt) 68%, transparent);

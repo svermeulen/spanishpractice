@@ -1278,6 +1278,7 @@ applyImageState();
 let sceneBlur = parseInt(localStorage.getItem("sceneBlur") ?? "3", 10);
 if (!Number.isFinite(sceneBlur)) sceneBlur = 3;
 function applySceneBlur() {
+  // Drives the frosted panes' backdrop-filter radius (see .scene-bg in CSS).
   document.documentElement.style.setProperty("--scene-blur", `${sceneBlur}px`);
 }
 const sceneBlurEl = $("sceneBlur");

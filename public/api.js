@@ -867,9 +867,9 @@ const IMAGE_BACKENDS = [
   { value: "openai", label: "OpenAI (gpt-image-1-mini)" },
   { value: "gemini", label: "Google Gemini (Imagen 4 Fast)" },
 ];
-// Approximate $/image for the cost ticker — low-quality 1024² (OpenAI) / one
+// Approximate $/image for the cost ticker — low-quality 1536×1024 (OpenAI) / one
 // Imagen 4 Fast image (Gemini). Order-of-magnitude only; update if they drift.
-const IMAGE_PRICES = { openai: 0.005, gemini: 0.02 };
+const IMAGE_PRICES = { openai: 0.008, gemini: 0.02 };
 
 function imageBackend() {
   const stored = localStorage.getItem("imageBackend");
@@ -913,7 +913,7 @@ async function openaiImage(prompt) {
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "gpt-image-1-mini", prompt, size: "1024x1024", quality: "low", n: 1 }),
+    body: JSON.stringify({ model: "gpt-image-1-mini", prompt, size: "1536x1024", quality: "low", n: 1 }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error?.message || `OpenAI image failed (${res.status})`);
@@ -923,7 +923,8 @@ async function openaiImage(prompt) {
 }
 
 // Google Imagen 4 Fast via the Gemini API :predict endpoint (reuses the Gemini
-// key). Returns base64 image bytes; 16:9 suits a full-width backdrop.
+// key). Cheapest Imagen tier (~1K); 16:9 suits a full-width backdrop. Returns
+// base64 image bytes.
 async function geminiImage(prompt) {
   const key = getKey("geminiApiKey");
   if (!key) throw new Error("Add your Google Gemini API key in Settings.");
