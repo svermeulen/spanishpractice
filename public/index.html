@@ -82,6 +82,9 @@
               <kbd class="setting-key">⌘I</kbd>
             </label>
             <label class="setting setting-row">
+              <span><input type="checkbox" id="checkAccents" /> Correct accents &amp; punctuation</span>
+            </label>
+            <label class="setting setting-row">
               <span><input type="checkbox" id="showCost" /> Show session cost</span>
             </label>
             <label class="setting setting-row tts-only">
@@ -96,6 +99,7 @@
         <div id="chatMessages" class="messages"></div>
         <form id="chatForm" class="input-row">
           <input id="chatInput" type="text" placeholder="Escribe en espanol..." autocomplete="off" />
+          <button type="button" id="micBtn" class="mic-btn" title="Speak in Spanish" aria-label="Speak in Spanish" aria-pressed="false">🎤</button>
           <button type="submit">Send</button>
         </form>
       </section>

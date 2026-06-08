@@ -23,6 +23,12 @@ provider you choose. Nothing is logged or proxied.
   auto-play by default. Works out of the box with your browser's built-in
   Spanish voices; add an ElevenLabs key for higher-quality, gender-matched
   voices.
+- **Voice input** — where the browser supports it, a 🎤 button lets you *speak*
+  your reply in Spanish; the transcript drops into the input for you to edit
+  before sending.
+- **Gentle on accents** — missing accents (á, ñ) and inverted punctuation
+  (¿ ¡) are forgiven by default (your keyboard may not have them); flip on
+  "Correct accents & punctuation" in Settings to have them checked too.
 - **Fresh scenarios** — every conversation starts from an AI-generated
   situation; 🎲 (or ⌘K) rolls a new one, ✎ lets you type your own, and 🤖
   previews the hidden AI-facing prompt.
@@ -45,14 +51,18 @@ with a spending limit.
 
 ## Run it locally
 
-No build step and no dependencies are needed to *run* the app — it's static
-files in `public/`.
+No build step, no dependencies, and **no Node/npm required** — it's just static
+files in `public/`. You only need to *serve* them over `http://` (rather than
+opening the file directly): a `file://` page sends `Origin: null`, which the
+provider APIs' CORS can reject, and browsers treat its `localStorage`
+inconsistently. Any static web server works — for example:
 
 ```sh
-npm start          # serves public/ at http://localhost:3000 (python3 http.server)
+python3 -m http.server 3000 --directory public   # then open http://localhost:3000
 ```
 
-…or open `public/index.html` with any static file server.
+There's also an `npm start` shortcut that runs exactly that command (purely for
+convenience — there are no packages to install).
 
 > Local AI servers (Ollama / LM Studio) work only when the page itself is served
 > over `http://` — a hosted `https` page can't call `http://localhost` (browser

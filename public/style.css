@@ -309,6 +309,32 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
 .input-row button:active:not(:disabled) { transform: scale(0.97); }
 .input-row button:disabled { opacity: 0.45; cursor: default; }
 
+/* Voice-input (🎤) button — sits between the input and Send */
+.mic-btn {
+  flex-shrink: 0;
+  padding: 0 14px;
+  font-size: 17px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.mic-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mic-btn.recording {
+  color: #fff;
+  background: var(--del);
+  border-color: var(--del);
+  animation: mic-pulse 1.3s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--del) 45%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--del) 0%, transparent); }
+}
+body.no-stt .mic-btn { display: none; }
+
 /* ---- Chat bubbles ---- */
 @keyframes rise-in {
   from { opacity: 0; transform: translateY(8px); }

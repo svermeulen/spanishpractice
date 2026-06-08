@@ -4,6 +4,7 @@ let autoShowEn = localStorage.getItem("autoShowEn") === "true";
 let autoShowNotes = localStorage.getItem("autoShowNotes") === "true";
 let showCost = localStorage.getItem("showCost") !== "false"; // shown by default
 let autoPlayAudio = localStorage.getItem("autoPlayAudio") !== "false"; // on by default
+let checkAccents = localStorage.getItem("checkAccents") === "true"; // off by default (lenient)
 let model = localStorage.getItem("model") || ""; // "" = no model chosen yet
 let voiceGender = null; // "male"|"female" from the scenario — matches the TTS voice
 let sessionCost = 0;
@@ -61,7 +62,12 @@ function normalizeSentence(s) {
   return (s || "").trim().split(/\s+/).map(normalizeWord).filter(Boolean).join(" ");
 }
 
-function wordDiff(original, corrected) {
+// `strict` (the "Correct accents & punctuation" setting): when true, accent-,
+// case-, and punctuation-only differences are shown as real corrections
+// (strikethrough/insertion) rather than forgiven/soft-highlighted. Word
+// alignment stays accent-insensitive either way, so "tu"→"tú" lines up as a
+// single fix instead of an unrelated delete+insert.
+function wordDiff(original, corrected, strict = false) {
   const a = original.trim().split(/\s+/).filter(Boolean);
   const b = corrected.trim().split(/\s+/).filter(Boolean);
   const eq = (x, y) => normalizeWord(x) === normalizeWord(y);
@@ -81,7 +87,13 @@ function wordDiff(original, corrected) {
   let i = 0, j = 0;
   while (i < m && j < n) {
     if (eq(a[i], b[j])) {
-      if (a[i] === b[j] || forgivenEqual(a[i], b[j], isSentenceStart(b, j))) {
+      if (a[i] === b[j]) {
+        ops.push({ type: "same", word: b[j] });
+      } else if (strict) {
+        // Accent/case/punctuation-only difference, counted as a real fix.
+        ops.push({ type: "del", word: a[i] });
+        ops.push({ type: "ins", word: b[j] });
+      } else if (forgivenEqual(a[i], b[j], isSentenceStart(b, j))) {
         ops.push({ type: "same", word: b[j] });
       } else {
         ops.push({ type: "soft", orig: a[i], corr: b[j] });
@@ -98,8 +110,8 @@ function wordDiff(original, corrected) {
   return ops;
 }
 
-function renderDiff(original, corrected) {
-  const ops = wordDiff(original, corrected);
+function renderDiff(original, corrected, strict = false) {
+  const ops = wordDiff(original, corrected, strict);
   const frag = document.createDocumentFragment();
   let hardChanges = false;
   ops.forEach((op, idx) => {
@@ -315,7 +327,7 @@ function addUserChatMessage(text) {
 
 function addCorrectionBlock(msg, originalText, turn) {
   const block = addEl(msg, "div", "correction");
-  const { frag, hardChanges } = renderDiff(originalText, turn.corrected_message);
+  const { frag, hardChanges } = renderDiff(originalText, turn.corrected_message, checkAccents);
   const diffLine = addEl(block, "div", "diff-line");
   diffLine.appendChild(frag);
   addSpeakButton(diffLine, () => turn.corrected_message);
@@ -468,6 +480,7 @@ async function sendChatMessage(text, existingMsg = null) {
       history: chatHistory,
       message: text,
       model,
+      strict: checkAccents,
     });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     thinking.remove();
@@ -893,6 +906,16 @@ autoPlayAudioEl.addEventListener("change", () => {
   localStorage.setItem("autoPlayAudio", String(autoPlayAudio));
 });
 
+// Strict accent/punctuation checking. Applies to subsequent messages — past
+// corrections were generated (and diffed) under the previous policy, so they're
+// left as-is rather than retroactively re-judged.
+const checkAccentsEl = $("checkAccents");
+checkAccentsEl.checked = checkAccents;
+checkAccentsEl.addEventListener("change", () => {
+  checkAccents = checkAccentsEl.checked;
+  localStorage.setItem("checkAccents", String(checkAccents));
+});
+
 // ---- Settings popover ----
 const settingsBtn = $("settingsBtn");
 const settingsPopup = $("settingsPopup");
@@ -908,6 +931,78 @@ settingsBtn.addEventListener("click", (e) => {
 // Clicks inside the popup shouldn't close it; clicks anywhere else should.
 settingsPopup.addEventListener("click", (e) => e.stopPropagation());
 document.addEventListener("click", () => toggleSettings(false));
+
+// ---- Voice input (Web Speech API) ----
+// Progressive enhancement: where the browser exposes SpeechRecognition, the 🎤
+// button dictates Spanish into the chat box. The transcript fills the input (not
+// auto-sent) so the learner can review/edit before pressing Send. The button is
+// hidden entirely where unsupported (Firefox, older Safari) via body.no-stt.
+const SpeechRecognitionCls = window.SpeechRecognition || window.webkitSpeechRecognition;
+const MIC_TITLE = "Speak in Spanish";
+let stopVoiceInput = () => {}; // assigned below when supported; no-op otherwise
+
+function setupVoiceInput() {
+  const micBtn = $("micBtn");
+  if (!SpeechRecognitionCls) {
+    document.body.classList.add("no-stt");
+    return;
+  }
+  let recognition = null;
+  let recognizing = false;
+
+  function reset() {
+    recognizing = false;
+    micBtn.classList.remove("recording");
+    micBtn.textContent = "🎤";
+    micBtn.setAttribute("aria-pressed", "false");
+    micBtn.title = MIC_TITLE;
+  }
+
+  function start() {
+    if (recognizing) return;
+    stopAudio(); // don't let the mic transcribe our own TTS
+    const input = $("chatInput");
+    const base = input.value.trim(); // dictation appends to anything already typed
+    let blocked = false;
+    recognition = new SpeechRecognitionCls();
+    recognition.lang = "es-ES";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      recognizing = true;
+      micBtn.classList.add("recording");
+      micBtn.textContent = "⏹";
+      micBtn.setAttribute("aria-pressed", "true");
+      micBtn.title = "Stop listening";
+    };
+    recognition.onresult = (e) => {
+      let transcript = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      input.value = base ? `${base} ${transcript}` : transcript;
+    };
+    recognition.onerror = (e) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") blocked = true;
+    };
+    recognition.onend = () => {
+      reset(); // resets the title; re-apply the blocked hint after, if needed
+      if (blocked) micBtn.title = "Microphone blocked — allow mic access to dictate";
+      $("chatInput").focus();
+    };
+    try {
+      recognition.start();
+    } catch {
+      reset(); // start() throws if called while already active
+    }
+  }
+
+  stopVoiceInput = () => {
+    if (recognition && recognizing) recognition.stop();
+  };
+  micBtn.addEventListener("click", () => (recognizing ? stopVoiceInput() : start()));
+  reset();
+}
+setupVoiceInput();
 
 // ---- Input history (shell-style Up/Down recall) ----
 // Up fills the input with previous sent messages (useful for re-typing the
@@ -951,6 +1046,7 @@ const resetTutorInputHistory = attachInputHistory($("tutorInput"), () =>
 
 $("chatForm").addEventListener("submit", (e) => {
   e.preventDefault();
+  stopVoiceInput(); // end any in-progress dictation so it can't refill the input
   const text = $("chatInput").value.trim();
   if (!text) return;
   $("chatInput").value = "";

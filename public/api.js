@@ -169,13 +169,13 @@ const TURN_SCHEMA = {
     notes: {
       type: "string",
       description:
-        "Brief explanation of the corrections and any useful tips, in English. Empty string if the message was already fine. If natural_message is provided, briefly say why it's the more natural phrasing. Never comment on missing accents, missing inverted punctuation, or missing capitalization at the start of sentences.",
+        "Brief explanation of the corrections and any useful tips, in English. Empty string if the message was already fine. If natural_message is provided, briefly say why it's the more natural phrasing. Follow the system prompt's policy on accents/punctuation.",
     },
     mistake_tags: {
       type: "array",
       items: { type: "string" },
       description:
-        "Short kebab-case category tags, one per distinct grammar/vocab mistake, e.g. ser-vs-estar, gender-agreement, verb-conjugation, word-order, preposition-choice, missing-article, vocab-false-friend, regional-vocab-spain, vosotros-forms, reflexive-verbs, preterite-vs-imperfect. Empty array if no mistakes. Do not tag accent, punctuation, or capitalization issues. Reuse the same tag spelling for the same mistake type across turns.",
+        "Short kebab-case category tags, one per distinct grammar/vocab mistake, e.g. ser-vs-estar, gender-agreement, verb-conjugation, word-order, preposition-choice, missing-article, vocab-false-friend, regional-vocab-spain, vosotros-forms, reflexive-verbs, preterite-vs-imperfect. Empty array if no mistakes. For accent/punctuation/capitalization, follow the system prompt's policy. Reuse the same tag spelling for the same mistake type across turns.",
     },
     reply_es: {
       type: "string",
@@ -220,7 +220,14 @@ const OPENING_SCHEMA = {
 };
 
 // ---- System prompts ----
-function chatSystemPrompt(situation) {
+// `strict` toggles how accents/inverted punctuation are judged (see the
+// "Correct accents & punctuation" setting). Either way corrected_message is
+// always written with proper accents; strict only decides whether the learner's
+// omissions count as mistakes (tagged / noted) or are silently fixed.
+function chatSystemPrompt(situation, strict = false) {
+  const accentPolicy = strict
+    ? `Treat missing or incorrect accents/tildes, missing ¿/¡, and missing capitalization at the start of sentences as mistakes: fix them in the corrected version, and you may note the meaning-changing ones (e.g. sí vs si, tú vs tu) and tag them (accent, punctuation, capitalization). Don't belabor every trivial accent in notes — focus on what's most useful.`
+    : `The learner has not set up their keyboard for Spanish accents or inverted punctuation, so never treat missing accents, missing tildes, missing ¿/¡, or missing capitalization at the start of sentences as mistakes. Always write the corrected version with proper accents and punctuation, but don't flag, tag, or comment on the learner's omissions of them.`;
   return `You are a friendly native Spanish speaker from Spain helping an English-speaking beginner practice Spanish through roleplay. The learner is moving to Spain, so always use Castilian (Peninsular) Spanish: vosotros for informal plural you, Spain vocabulary and expressions (vale, coger, ordenador, movil, zumo, patatas, conducir, echar de menos, etc.), and Spain usage generally.
 
 When correcting, prefer how it would naturally be said in Spain. If the learner uses a Latin American form that differs in Spain (e.g. ustedes for informal plural, jugo, computadora, manejar), correct it to the Spain form and briefly explain the regional difference in notes.
@@ -229,7 +236,7 @@ Roleplay situation: ${situation}
 
 Stay in character as a person who makes sense in this situation. Keep your replies very short and simple (1-2 sentences, beginner-friendly vocabulary) so the learner is likely to understand, and naturally include a question in each reply to keep the conversation going.
 
-The learner has not set up their keyboard for Spanish accents or inverted punctuation, so never treat missing accents, missing tildes, missing ¿/¡, or missing capitalization at the start of sentences as mistakes.
+${accentPolicy}
 
 For every learner message, produce the structured turn data: your interpretation of their intent, the corrected version of their message (close to their attempt, errors fixed), the natural version (only when a native would phrase it noticeably differently), correction notes, mistake category tags, and your in-character reply with its English translation.`;
 }
@@ -273,10 +280,10 @@ function parseStructured(text) {
   }
 }
 
-async function apiChat({ situation, history = [], message, model }) {
+async function apiChat({ situation, history = [], message, model, strict = false }) {
   const { text, usage } = await complete({
     model,
-    system: chatSystemPrompt(situation),
+    system: chatSystemPrompt(situation, strict),
     messages: [...history, { role: "user", content: message }],
     schema: TURN_SCHEMA,
     maxTokens: 16000,
