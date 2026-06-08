@@ -898,7 +898,7 @@ const IMAGE_STYLES = {
   pixel: { label: "Pixel art", prompt: "Detailed retro 16-bit pixel art" },
   poster: { label: "Travel poster", prompt: "A vintage mid-century travel-poster illustration" },
 };
-const DEFAULT_IMAGE_STYLE = "photo";
+const DEFAULT_IMAGE_STYLE = "anime";
 function getImageStyle(id) {
   return IMAGE_STYLES[id] || IMAGE_STYLES[DEFAULT_IMAGE_STYLE];
 }

@@ -432,12 +432,6 @@ function trackUsage(usage) {
   updateTicker();
 }
 
-function resetUsage() {
-  sessionCost = 0;
-  sessionTokens = { in: 0, out: 0 };
-  updateTicker();
-}
-
 // ---- Conversation flow ----
 // The AI opens each new session. We seed chatHistory with the same instruction
 // the opening call used (OPENING_INSTRUCTION, a global from api.js, which loads
@@ -633,7 +627,9 @@ function resetSessionState() {
   chatHistory = [];
   tutorHistory = [];
   transcript = [];
-  resetUsage();
+  // Note: session cost/tokens are intentionally NOT reset here — the ticker is a
+  // running total for the whole page session (across situations), cleared only
+  // on a page reload (the vars init to 0 on load).
   resetAudio();
   sceneDescription = "";
   sceneImageInFlight = false;
@@ -1297,7 +1293,7 @@ applyImageState();
 let sceneBlur = parseInt(localStorage.getItem("sceneBlur") ?? "0", 10);
 if (!Number.isFinite(sceneBlur)) sceneBlur = 0;
 function applySceneBlur() {
-  // Drives the frosted panes' backdrop-filter radius (see .scene-bg in CSS).
+  // Drives the chat pane's backdrop-filter radius (see .chat-pane in CSS).
   document.documentElement.style.setProperty("--scene-blur", `${sceneBlur}px`);
 }
 const sceneBlurEl = $("sceneBlur");
@@ -1308,6 +1304,22 @@ sceneBlurEl.addEventListener("input", () => {
   applySceneBlur();
 });
 applySceneBlur();
+
+// Scene-background tint (% theme color overlaid on the photo behind the chat).
+// 0 = photo as-is; defaults to a subtle 20%. Live as the slider drags.
+let sceneTint = parseInt(localStorage.getItem("sceneTint") ?? "20", 10);
+if (!Number.isFinite(sceneTint)) sceneTint = 20;
+function applySceneTint() {
+  document.documentElement.style.setProperty("--scene-tint", `${sceneTint}%`);
+}
+const sceneTintEl = $("sceneTint");
+sceneTintEl.value = String(sceneTint);
+sceneTintEl.addEventListener("input", () => {
+  sceneTint = parseInt(sceneTintEl.value, 10) || 0;
+  localStorage.setItem("sceneTint", String(sceneTint));
+  applySceneTint();
+});
+applySceneTint();
 
 // Strict accent/punctuation checking. Applies to subsequent messages — past
 // corrections were generated (and diffed) under the previous policy, so they're
@@ -1798,8 +1810,8 @@ function restoreSession() {
     tutorHistory.push({ role: "assistant", content: answer });
     tutorTurns.push({ question, answer });
   }
-  sessionCost = snap.cost || 0;
-  sessionTokens = { in: snap.tokensIn || 0, out: snap.tokensOut || 0 };
+  // Cost/tokens are a per-page-load running total, so a reload starts fresh at
+  // 0 (the snapshot's cost isn't restored); new turns in this session add to it.
   updateTicker();
 
   restoring = false;

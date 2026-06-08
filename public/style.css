@@ -108,14 +108,15 @@ button { font-family: inherit; }
 }
 .scene-bg.ready { opacity: 1; }
 /* When a scene is shown the canvas goes transparent and the chat pane shows the
-   photo as-is (no tint) — only the optional blur is applied, driven by the
-   Background-blur slider (--scene-blur). The header and tutor pane stay opaque,
-   so the scene sits behind the conversation alone. Message bubbles, the
+   photo behind the conversation, with two independent, slider-driven knobs: the
+   Background-blur (--scene-blur) backdrop-filter and a theme-colored tint
+   overlay (--scene-tint, 0% = photo as-is). The header and tutor pane stay
+   opaque, so the scene sits behind the conversation alone. Message bubbles, the
    correction box, and the reply-meta chip keep their own solid backgrounds for
    text legibility. */
 body.has-scene { background: transparent; }
 body.has-scene .chat-pane {
-  background: transparent;
+  background: color-mix(in srgb, var(--pane-bg) var(--scene-tint, 20%), transparent);
   -webkit-backdrop-filter: blur(var(--scene-blur, 0px));
   backdrop-filter: blur(var(--scene-blur, 0px));
 }
