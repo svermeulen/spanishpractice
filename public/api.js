@@ -492,8 +492,13 @@ const SCENARIO_SCHEMA = {
       description:
         "A vivid, concrete third-person description of the physical SETTING for a text-to-image generator. Name the specific place, then 3–5 concrete visual details — architecture, key objects, materials, colours, lighting, time of day — so the image unmistakably depicts THIS location. Lead with the place. No people, no second-person, no dialogue, no text/signs. e.g. \"The interior of a traditional Madrid tapas bar at midday: a long zinc counter, cured hams hanging from the ceiling, blue-and-white tiled walls, wooden stools, warm afternoon light through a large window.\"",
     },
+    partner_visual: {
+      type: "string",
+      description:
+        "A short third-person physical description of the AI roleplay partner for an image generator — their role, approximate age, gender (matching voice_gender), and clothing. No name, no dialogue. e.g. \"a friendly middle-aged male waiter in a white apron and black shirt\".",
+    },
   },
-  required: ["learner", "ai", "voice_gender", "image_prompt"],
+  required: ["learner", "ai", "voice_gender", "image_prompt", "partner_visual"],
   additionalProperties: false,
 };
 
@@ -508,9 +513,10 @@ function scenarioSystemPrompt(level = DEFAULT_LEVEL, region = DEFAULT_REGION, co
 - "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". This can be as long as is genuinely helpful (1–3 sentences). Match the complexity to the learner's level.
 - "voice_gender": "male" or "female" — the AI partner's gender, so a matching voice can be picked for audio.
 - "image_prompt": a vivid, concrete description of the physical SETTING for a background image generator. Lead with the specific place, then 3–5 concrete visual details (architecture, key objects, materials, colours, lighting, time of day) grounded in ${reg.place}, so the image clearly depicts THIS location. No people, no second-person, no dialogue, no text/signs.
+- "partner_visual": a short third-person physical description of the AI partner for an image generator (role, approximate age, gender matching voice_gender, clothing; no name).
 
 Example:
-{"learner":"You're ordering lunch at a traditional restaurant and asking the waiter for a recommendation.","ai":"A traditional local restaurant. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male","image_prompt":"The interior of a traditional ${reg.place} restaurant at midday: wooden tables with paper tablecloths, a tiled bar, bottles on shelves, framed photos on the walls, warm daylight through a large window."}${ctxBlock}`;
+{"learner":"You're ordering lunch at a traditional restaurant and asking the waiter for a recommendation.","ai":"A traditional local restaurant. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male","image_prompt":"The interior of a traditional ${reg.place} restaurant at midday: wooden tables with paper tablecloths, a tiled bar, bottles on shelves, framed photos on the walls, warm daylight through a large window.","partner_visual":"a friendly middle-aged male waiter in a white apron and black shirt"}${ctxBlock}`;
 }
 
 const SCENARIO_THEMES = [
@@ -909,19 +915,24 @@ function getImageStyleOptions() {
 }
 
 // Wrap a raw scene description for a legible backdrop. The SETTING leads (so it
-// drives the content), the style is a trailing modifier, then the composition
-// constraints: a wide establishing shot, nothing crowding the foreground, and no
-// readable text (image models render garbled lettering that looks bad behind
-// real UI text).
-function buildImagePrompt(scene, style = DEFAULT_IMAGE_STYLE) {
-  return `A wide establishing shot in which the location itself is the subject — depict this specific setting faithfully and in detail: ${scene}. ${getImageStyle(style).prompt} No people in the foreground, and absolutely no readable text, words, letters, or signs. Composed to sit softly behind on-screen text.`;
+// drives the content), then the style modifier, then constraints. When a partner
+// is given, place them on the LEFT and reserve the RIGHT as open copy space (the
+// UI flows the chat over that side); otherwise it's an empty establishing shot.
+// No readable text either way (image models render garbled lettering that looks
+// bad behind real UI text).
+function buildImagePrompt(scene, partner, style = DEFAULT_IMAGE_STYLE) {
+  const p = (partner || "").trim();
+  const composition = p
+    ? `A wide establishing shot of this setting: ${scene} On the LEFT side of the frame, ${p}, standing and facing the viewer. Keep the RIGHT side open, calm, and uncluttered — generous empty copy space showing more of the setting, reserved for text overlay.`
+    : `A wide establishing shot in which the location itself is the subject — depict this specific setting faithfully and in detail: ${scene} No people.`;
+  return `${composition} ${getImageStyle(style).prompt} No readable text, words, letters, or signs anywhere.`;
 }
 
 // Dispatch to the selected backend → { blob, usage }. "none" never reaches here.
-async function apiImage({ scene, style = DEFAULT_IMAGE_STYLE }) {
+async function apiImage({ scene, partner = "", style = DEFAULT_IMAGE_STYLE }) {
   if (!scene || typeof scene !== "string") throw new Error("scene is required");
   const backend = imageBackend();
-  const prompt = buildImagePrompt(scene.slice(0, 700), style);
+  const prompt = buildImagePrompt(scene.slice(0, 700), (partner || "").slice(0, 200), style);
   let blob;
   if (backend === "openai") blob = await openaiImage(prompt);
   else if (backend === "gemini") blob = await geminiImage(prompt);

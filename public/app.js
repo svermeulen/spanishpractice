@@ -632,6 +632,7 @@ function resetSessionState() {
   // on a page reload (the vars init to 0 on load).
   resetAudio();
   sceneDescription = "";
+  partnerVisual = "";
   sceneImageInFlight = false;
   clearSceneImage();
   chatMessagesEl.innerHTML = "";
@@ -646,11 +647,12 @@ function resetSessionState() {
 // fired when a situation starts, never per message — so cost stays low. It's
 // best-effort eye-candy: any failure silently keeps the solid background.
 let sceneDescription = ""; // text fed to the image model (image_prompt / situation)
+let partnerVisual = ""; // physical description of the AI partner (placed left in the image)
 let sceneImageUrl = null; // current object URL, revoked when replaced/cleared
 let sceneImageInFlight = false;
 
 function clearSceneImage() {
-  document.body.classList.remove("has-scene");
+  document.body.classList.remove("has-scene", "has-partner");
   const bg = $("sceneBg");
   bg.classList.remove("ready");
   bg.style.backgroundImage = "";
@@ -666,6 +668,9 @@ function applySceneImage(url) {
   sceneImageUrl = url;
   bg.style.backgroundImage = `url("${url}")`;
   document.body.classList.add("has-scene");
+  // has-partner shifts the chat to the right so the left-placed character isn't
+  // covered by text (see CSS). Only when we actually asked for a partner.
+  document.body.classList.toggle("has-partner", Boolean(partnerVisual));
   requestAnimationFrame(() => bg.classList.add("ready")); // let the fade transition run
 }
 
@@ -674,7 +679,7 @@ async function generateSceneImage() {
   sceneImageInFlight = true;
   const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   try {
-    const { blob, usage } = await apiImage({ scene: sceneDescription, style: imageStyle });
+    const { blob, usage } = await apiImage({ scene: sceneDescription, partner: partnerVisual, style: imageStyle });
     if (mySession !== sessionId) return; // session reset while we awaited — discard
     applySceneImage(URL.createObjectURL(blob));
     trackUsage(usage);
@@ -732,6 +737,7 @@ async function startRandomSession() {
     situationDisplay = sc.learner;
     voiceGender = sc.voice_gender || null;
     sceneDescription = sc.image_prompt || sc.learner || sc.ai;
+    partnerVisual = sc.partner_visual || "";
     renderSituationLabel();
     generateOpening(); // takes over the Send-button state from here
     generateSceneImage(); // async backdrop, fades in behind the chat
@@ -1750,6 +1756,7 @@ function saveSession() {
         situationDisplay,
         voiceGender,
         sceneDescription,
+        partnerVisual,
         opening,
         turns,
         tutorTurns,
@@ -1785,6 +1792,7 @@ function restoreSession() {
   situationDisplay = snap.situationDisplay || "";
   voiceGender = snap.voiceGender || null;
   sceneDescription = snap.sceneDescription || snap.situationDisplay || "";
+  partnerVisual = snap.partnerVisual || "";
   opening = snap.opening;
 
   addTeacherMessage(opening);

@@ -131,6 +131,30 @@ body.has-scene .reply-meta {
   border-radius: 12px;
 }
 
+/* Partner-on-left layout: when the scene image includes the roleplay partner
+   (placed on the left), anchor the photo left, reserve the left side for the
+   character, and shift the whole chat column to the right with a directional
+   tint behind it (clear on the left so the character shows; tinted on the right
+   behind text). The chat keeps its classic left/right split (teacher left,
+   learner right) within that shifted region. has-partner implies has-scene, and
+   comes after it so it wins. */
+body.has-partner .scene-bg { background-position: left center; }
+body.has-partner .chat-pane {
+  background: linear-gradient(to right, transparent 0%, transparent 34%, color-mix(in srgb, var(--pane-bg) var(--scene-tint, 20%), transparent) 58%);
+}
+body.has-partner .chat-pane .messages,
+body.has-partner .chat-pane .input-row { padding-left: 40%; }
+/* Narrow screens can't spare the left third for a character and still fit the
+   chat, so fall back to full-width chat over a flat tint. */
+@media (max-width: 680px) {
+  body.has-partner .scene-bg { background-position: center; }
+  body.has-partner .chat-pane {
+    background: color-mix(in srgb, var(--pane-bg) var(--scene-tint, 20%), transparent);
+  }
+  body.has-partner .chat-pane .messages,
+  body.has-partner .chat-pane .input-row { padding-left: 0; }
+}
+
 /* ---- Main layout ---- */
 .main {
   display: flex;
