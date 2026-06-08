@@ -10,7 +10,7 @@ npm start            # serves public/ at http://localhost:3000 (python3 -m http.
 
 No build step and no dependencies needed to run the app — `npm start` just serves the static `public/` folder. Open the app, click ⚙ Settings, pick a model, and paste the API key for that model's provider (Anthropic / OpenAI / Gemini, or a custom endpoint); optionally add an ElevenLabs key (enables 🔊 audio). Keys live only in the browser and are sent directly to the providers.
 
-Deploy: pushing to `main` publishes `public/` to GitHub Pages via `.github/workflows/deploy.yml` (enable Pages once: Settings → Pages → Source: GitHub Actions). Served at the custom domain **spanishpractice.app** (the Pages `cname`, also asserted by `public/CNAME`); DNS is managed in Cloudflare (CNAME-flattened apex → `svermeulen.github.io`). The fallback Pages URL is `svermeulen.github.io/spanish-converser/`.
+Deploy: pushing to `main` publishes `public/` to GitHub Pages via `.github/workflows/deploy.yml` (enable Pages once: Settings → Pages → Source: GitHub Actions). Served at the custom domain **spanishpractice.app** (the Pages `cname`, also asserted by `public/CNAME`); DNS is managed in Cloudflare (CNAME-flattened apex → `svermeulen.github.io`). The fallback Pages URL is `svermeulen.github.io/spanishpractice/`.
 
 The only thing that needs Node/npm is regenerating the scenario deck — `npm install` then `npm run generate-scenarios` (uses `@anthropic-ai/sdk`, a devDependency, with `ANTHROPIC_API_KEY` in the env).
 
