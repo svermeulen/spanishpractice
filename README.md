@@ -19,8 +19,10 @@ provider you choose. Nothing is logged or proxied.
   "more natural" phrasing is offered when it differs meaningfully.
 - **Tutor side-panel** — ask grammar/vocabulary questions in English at any
   time; it has the conversation transcript as context.
-- **Audio (optional)** — 🔊 buttons speak any line via ElevenLabs (⌥-click for
-  slow), if you add an ElevenLabs key.
+- **Audio** — 🔊 buttons speak any line (⌥-click for slower), and replies
+  auto-play by default. Works out of the box with your browser's built-in
+  Spanish voices; add an ElevenLabs key for higher-quality, gender-matched
+  voices.
 - **Fresh scenarios** — every conversation starts from an AI-generated
   situation; 🎲 (or ⌘K) rolls a new one, ✎ lets you type your own, and 🤖
   previews the hidden AI-facing prompt.

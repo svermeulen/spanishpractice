@@ -486,6 +486,7 @@ ins {
   50% { opacity: 0.15; }
 }
 body.no-tts .speak-btn { display: none; }
+body.no-tts .tts-only { display: none; }
 
 /* ---- Onboarding modal ---- */
 .onb-overlay {

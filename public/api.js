@@ -306,17 +306,24 @@ const SCENARIO_SCHEMA = {
       description:
         'Hidden from the learner, used to instruct the model: the setting plus the AI roleplay partner\'s persona/role, addressed as "You". 1-2 sentences in English.',
     },
+    voice_gender: {
+      type: "string",
+      enum: ["male", "female"],
+      description:
+        "The gender of the AI roleplay partner, so a matching voice can be chosen for audio. Pick whichever fits the persona; for an ambiguous role, just pick one.",
+    },
   },
-  required: ["learner", "ai"],
+  required: ["learner", "ai", "voice_gender"],
   additionalProperties: false,
 };
 
 const SCENARIO_SYSTEM = `You generate a single roleplay scenario for an English speaker practicing beginner Spanish who is moving to Spain. Set it in Spain (vary the cities and regions) and assume Castilian Spanish. Return two fields, both 1-2 sentences in English:
 - "learner": shown to the learner — the situation and the LEARNER's own role, addressed as "You". Do not describe the AI partner.
 - "ai": hidden from the learner, used to instruct the model — the setting plus the AI roleplay partner's persona/role, addressed as "You". Keep it simple enough for a beginner to navigate.
+- "voice_gender": "male" or "female" — the AI partner's gender, so a matching voice can be picked for audio.
 
 Example:
-{"learner":"You're ordering lunch at a traditional restaurant in Madrid and asking the waiter for a recommendation.","ai":"A traditional restaurant in Madrid. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply."}`;
+{"learner":"You're ordering lunch at a traditional restaurant in Madrid and asking the waiter for a recommendation.","ai":"A traditional restaurant in Madrid. You are the waiter taking the learner's order and recommending the house specialty. Speak slowly and simply.","voice_gender":"male"}`;
 
 const SCENARIO_THEMES = [
   "ordering at a restaurant, bar, or café",
@@ -501,37 +508,48 @@ function toGeminiSchema(s) {
 // ---- Text-to-speech (ElevenLabs, direct browser call) ----
 const TTS_MODEL = "eleven_multilingual_v2";
 
-// ElevenLabs premade voices (work on the free plan). The multilingual model
+// ElevenLabs premade voices (work on the free plan), split by gender so the
+// roleplay partner's voice can match the scenario. The multilingual model
 // speaks good Spanish with any of these.
-const TTS_VOICES = [
-  ["onwK4e9ZLuTAKqWW03F9", "Daniel"],
-  ["JBFqnCBsd6RMkjVDRZzb", "George"],
-  ["EXAVITQu4vr4xnSDxMaL", "Sarah"],
-  ["XB0fDUnXU5powFXDhCwa", "Charlotte"],
-  ["cjVigY5qzO86Huf0OWal", "Eric"],
-  ["pFZP5JQG7iQjIQuC4Bku", "Lily"],
-];
+const TTS_VOICES = {
+  male: [
+    ["onwK4e9ZLuTAKqWW03F9", "Daniel"],
+    ["JBFqnCBsd6RMkjVDRZzb", "George"],
+    ["cjVigY5qzO86Huf0OWal", "Eric"],
+  ],
+  female: [
+    ["EXAVITQu4vr4xnSDxMaL", "Sarah"],
+    ["XB0fDUnXU5powFXDhCwa", "Charlotte"],
+    ["pFZP5JQG7iQjIQuC4Bku", "Lily"],
+  ],
+};
 
-// One consistent voice per session (so the roleplay partner doesn't change
-// voice mid-conversation), varying across sessions.
-function ttsVoiceForSession(sessionId) {
+// One consistent voice per session (so the partner doesn't change voice
+// mid-conversation), from the gender pool when known, else the whole set.
+function ttsVoiceForSession(sessionId, gender) {
+  const pool = TTS_VOICES[gender] || [...TTS_VOICES.male, ...TTS_VOICES.female];
   let h = 0;
   for (const ch of String(sessionId || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return TTS_VOICES[h % TTS_VOICES.length];
+  return pool[h % pool.length];
 }
 
-function ttsEnabled() {
+// ElevenLabs is the premium path (needs a key); the browser's built-in speech
+// synthesis is the free fallback. Audio is available if either exists.
+function ttsHasElevenLabs() {
   return Boolean(getElevenLabsKey());
 }
+function ttsAvailable() {
+  return ttsHasElevenLabs() || typeof speechSynthesis !== "undefined";
+}
 
-async function apiTts({ text, sessionId, slow }) {
+async function apiTts({ text, sessionId, slow, gender }) {
   const key = getElevenLabsKey();
   if (!key) throw new Error("TTS not configured — add an ElevenLabs API key in Settings.");
   if (!text || typeof text !== "string" || text.length > 600) {
     throw new Error("text is required (max 600 chars)");
   }
   const speed = slow ? 0.8 : 1.0;
-  const [voiceId] = ttsVoiceForSession(sessionId);
+  const [voiceId] = ttsVoiceForSession(sessionId, gender);
   const res = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
     {

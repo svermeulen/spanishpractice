@@ -3,7 +3,9 @@ const isDemo = new URLSearchParams(location.search).has("demo");
 let autoShowEn = localStorage.getItem("autoShowEn") === "true";
 let autoShowNotes = localStorage.getItem("autoShowNotes") === "true";
 let showCost = localStorage.getItem("showCost") !== "false"; // shown by default
+let autoPlayAudio = localStorage.getItem("autoPlayAudio") !== "false"; // on by default
 let model = localStorage.getItem("model") || ""; // "" = no model chosen yet
+let voiceGender = null; // "male"|"female" from the scenario — matches the TTS voice
 let sessionCost = 0;
 let sessionTokens = { in: 0, out: 0 };
 let situation = ""; // AI-facing role/persona — sent to the prompt, hidden from the UI
@@ -125,54 +127,100 @@ function renderDiff(original, corrected) {
 }
 
 // ---- Audio (TTS) ----
-// On-demand phrase audio via ElevenLabs (called directly from the browser).
-// Buttons are hidden (body.no-tts) until the user supplies an ElevenLabs key.
+// Two backends: ElevenLabs (premium, needs a key) when one is set, otherwise the
+// browser's built-in speech synthesis (free). Buttons hide (body.no-tts) only
+// when neither is available. Voice tries to match the scenario's voiceGender.
+const SPEAK_TITLE = "Play audio — ⌥click for slow";
+
 function applyTtsVisibility() {
-  document.body.classList.toggle("no-tts", !ttsEnabled());
+  document.body.classList.toggle("no-tts", !ttsAvailable());
 }
 applyTtsVisibility();
 
-const audioCache = new Map(); // `${slow}|${text}` -> object URL
-let currentAudio = null; // {audio, btn}
+const audioCache = new Map(); // `${gender}|${slow}|${text}` -> object URL (ElevenLabs)
+let currentAudio = null; // { btn, audio } | { btn, browser: true, utterance }
 
 function stopAudio() {
   if (!currentAudio) return;
-  currentAudio.audio.pause();
+  if (currentAudio.browser) speechSynthesis.cancel();
+  else currentAudio.audio.pause();
   currentAudio.btn.classList.remove("playing");
   currentAudio.btn.textContent = "🔊";
   currentAudio = null;
 }
 
-// Clips are voiced per-session (voice = hash of sessionId), so the cache must
-// not survive a session switch — otherwise a phrase shared between sessions
-// would replay the previous session's voice. Also revokes URLs to avoid a leak.
+// Clips are voiced per-session, so the cache must not survive a session switch —
+// otherwise a phrase shared between sessions would replay the previous voice.
 function resetAudio() {
   stopAudio();
   for (const url of audioCache.values()) URL.revokeObjectURL(url);
   audioCache.clear();
 }
 
-async function playTts(text, slow, btn) {
-  // Ignore re-clicks while this button's clip is still being fetched, so a
-  // double-click can't start two overlapping plays.
+// Best-effort browser voice: a Castilian (es-ES) voice, preferring one whose
+// name matches the partner's gender, consistent per session. Browsers don't
+// expose voice gender, so this is a name heuristic that degrades gracefully.
+const VOICE_NAMES_FEMALE = ["mónica", "monica", "marisol", "paulina", "laura", "esperanza", "helena", "lucía", "lucia", "female", "mujer"];
+const VOICE_NAMES_MALE = ["jorge", "diego", "carlos", "enrique", "pablo", "juan", "male", "hombre"];
+function pickBrowserVoice(gender) {
+  const all = (typeof speechSynthesis !== "undefined" && speechSynthesis.getVoices()) || [];
+  const es = all.filter((v) => /^es(-|_|$)/i.test(v.lang));
+  if (!es.length) return null;
+  const esES = es.filter((v) => /es[-_]es/i.test(v.lang));
+  let pool = esES.length ? esES : es;
+  const names = gender === "female" ? VOICE_NAMES_FEMALE : gender === "male" ? VOICE_NAMES_MALE : null;
+  if (names) {
+    const matched = pool.filter((v) => names.some((n) => v.name.toLowerCase().includes(n)));
+    if (matched.length) pool = matched;
+  }
+  let h = 0;
+  for (const ch of String(sessionId || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return pool[h % pool.length];
+}
+
+function speakBrowser(text, slow, btn) {
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "es-ES";
+  u.rate = slow ? 0.7 : 1.0;
+  const v = pickBrowserVoice(voiceGender);
+  if (v) u.voice = v;
+  currentAudio = { btn, browser: true, utterance: u };
+  btn.classList.add("playing");
+  btn.textContent = "⏹";
+  u.onend = u.onerror = () => {
+    if (currentAudio?.utterance === u) stopAudio();
+  };
+  speechSynthesis.speak(u);
+}
+
+// `auto` = autoplay-initiated: fail silently (don't flash ⚠ if a browser blocks
+// playback before the first user gesture).
+async function playTts(text, slow, btn, auto = false) {
   if (btn.classList.contains("loading")) return;
-  // Clicking the button that's currently playing stops it.
   if (currentAudio?.btn === btn) {
     stopAudio();
     return;
   }
   stopAudio();
-  const key = `${slow}|${text}`;
+
+  // Free path: browser speech synthesis (no ElevenLabs key).
+  if (!ttsHasElevenLabs()) {
+    if (typeof speechSynthesis !== "undefined") speakBrowser(text, slow, btn);
+    return;
+  }
+
+  // Premium path: ElevenLabs — fetch the mp3 (cached as object URLs).
+  const cacheKey = `${voiceGender}|${slow}|${text}`;
   btn.classList.add("loading");
   try {
-    let url = audioCache.get(key);
+    let url = audioCache.get(cacheKey);
     if (!url) {
-      const blob = await apiTts({ text, sessionId, slow });
+      const blob = await apiTts({ text, sessionId, slow, gender: voiceGender });
       url = URL.createObjectURL(blob);
-      audioCache.set(key, url);
+      audioCache.set(cacheKey, url);
     }
     const audio = new Audio(url);
-    currentAudio = { audio, btn };
+    currentAudio = { btn, audio };
     btn.classList.add("playing");
     btn.textContent = "⏹";
     audio.addEventListener("ended", () => {
@@ -180,18 +228,20 @@ async function playTts(text, slow, btn) {
     });
     await audio.play();
   } catch (err) {
-    btn.textContent = "⚠";
-    btn.title = err.message;
-    setTimeout(() => {
+    if (auto) {
       btn.textContent = "🔊";
-      btn.title = SPEAK_TITLE;
-    }, 2500);
+    } else {
+      btn.textContent = "⚠";
+      btn.title = err.message;
+      setTimeout(() => {
+        btn.textContent = "🔊";
+        btn.title = SPEAK_TITLE;
+      }, 2500);
+    }
   } finally {
     btn.classList.remove("loading");
   }
 }
-
-const SPEAK_TITLE = "Play audio — ⌥click for slow";
 
 function addSpeakButton(parent, getText) {
   const btn = addEl(parent, "button", "speak-btn", "🔊");
@@ -272,13 +322,17 @@ function addCorrectionBlock(msg, originalText, turn) {
 function addTeacherMessage(turn) {
   const msg = addEl(chatMessagesEl, "div", "msg teacher");
   const bubble = addEl(msg, "div", "bubble", turn.reply_es);
-  addSpeakButton(bubble, () => turn.reply_es);
+  const speakBtn = addSpeakButton(bubble, () => turn.reply_es);
   const wrap = addEl(msg, "div");
   const toggle = addEl(wrap, "span", "en-toggle", "EN ▾");
   const body = addEl(wrap, "div", "en-body", turn.reply_en);
   if (!autoShowEn) body.classList.add("hidden");
   toggle.addEventListener("click", () => revealBody(body, body.classList.toggle("hidden")));
   scrollToBottom(chatMessagesEl);
+  // Auto-play the reply (listening practice) when enabled and audio is available.
+  if (autoPlayAudio && ttsAvailable() && !isDemo) {
+    playTts(turn.reply_es, false, speakBtn, true);
+  }
 }
 
 function addThinking(parent) {
@@ -484,6 +538,7 @@ function addTutorIntro() {
 // after an async generation for a random one).
 function resetSessionState() {
   sessionId = crypto.randomUUID();
+  voiceGender = null;
   turns = [];
   tutorTurns = [];
   opening = null;
@@ -539,6 +594,7 @@ async function startRandomSession() {
     thinking.remove();
     situation = sc.ai;
     situationDisplay = sc.learner;
+    voiceGender = sc.voice_gender || null;
     renderSituationLabel();
     generateOpening(); // manages input enabled-state from here
   } catch (err) {
@@ -785,6 +841,13 @@ showCostEl.addEventListener("change", () => {
   showCost = showCostEl.checked;
   localStorage.setItem("showCost", String(showCost));
   applyCostVisibility();
+});
+
+const autoPlayAudioEl = $("autoPlayAudio");
+autoPlayAudioEl.checked = autoPlayAudio;
+autoPlayAudioEl.addEventListener("change", () => {
+  autoPlayAudio = autoPlayAudioEl.checked;
+  localStorage.setItem("autoPlayAudio", String(autoPlayAudio));
 });
 
 // ---- Settings popover ----
