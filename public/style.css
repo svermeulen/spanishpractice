@@ -392,7 +392,12 @@ header button:hover { border-color: var(--accent); color: var(--accent); }
 }
 .input-row button:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16); }
 .input-row button:active:not(:disabled) { transform: scale(0.97); }
-.input-row button:disabled { opacity: 0.45; cursor: default; }
+.input-row button:disabled {
+  background: var(--bubble-alt);
+  color: var(--muted);
+  box-shadow: none;
+  cursor: default;
+}
 
 /* Voice-input (🎤) button — sits between the input and Send */
 .mic-btn {

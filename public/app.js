@@ -17,6 +17,8 @@ let turns = []; // [{message, turn}] — in-memory conversation state (not persi
 let tutorTurns = []; // [{question, answer}]
 let opening = null; // {reply_es, reply_en} — the AI's in-character first message
 let openingInFlight = false; // true while the opening request is running
+let sendInFlight = false; // true while a chat message is being answered
+let scenarioInFlight = false; // true while a new scenario is being generated
 let restoring = false; // true while rebuilding a saved session (suppresses autoplay)
 let chatHistory = []; // [{role, content}] — assistant entries are reply_es only
 let tutorHistory = [];
@@ -439,16 +441,22 @@ function seedOpeningHistory() {
   transcript.push(`Teacher: ${opening.reply_es}`);
 }
 
+// The chat input is always typeable — only *sending* is gated. Send is enabled
+// only once a conversation is ready (an opening exists) and nothing is in flight
+// (scenario generation, the opening, or a previous message). Derived from state
+// and re-synced whenever it changes, so callers never poke the input/button by hand.
+function syncSendButton() {
+  const ready = Boolean(opening) && !scenarioInFlight && !openingInFlight && !sendInFlight;
+  $("chatForm").querySelector("button").disabled = !ready;
+}
+
 async function generateOpening() {
   // One opening per session, only once a usable model+key exists and a session
   // is set up. Guards against double-firing (boot + onboarding + key changes).
   if (!situation || opening || openingInFlight || !hasKeyForModel(model)) return;
   openingInFlight = true;
   const mySession = sessionId; // bail if a newer session supersedes us mid-flight
-  const input = $("chatInput");
-  const button = $("chatForm").querySelector("button");
-  input.disabled = true;
-  button.disabled = true;
+  syncSendButton();
   const thinking = addThinking(chatMessagesEl);
   scrollToBottom(chatMessagesEl);
   try {
@@ -466,22 +474,19 @@ async function generateOpening() {
     addError(chatMessagesEl, err.message, generateOpening);
   } finally {
     // Only the current session owns the shared UI/lock state; a superseded call
-    // must leave the new session's input state and openingInFlight untouched.
+    // must leave the new session's state untouched.
     if (mySession === sessionId) {
       openingInFlight = false;
-      input.disabled = false;
-      button.disabled = false;
-      input.focus();
+      syncSendButton();
+      $("chatInput").focus();
       scrollToBottom(chatMessagesEl);
     }
   }
 }
 
 async function sendChatMessage(text, existingMsg = null) {
-  const input = $("chatInput");
-  const button = $("chatForm").querySelector("button");
-  input.disabled = true;
-  button.disabled = true;
+  sendInFlight = true;
+  syncSendButton();
 
   const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   const msg = existingMsg ?? addUserChatMessage(text);
@@ -515,9 +520,9 @@ async function sendChatMessage(text, existingMsg = null) {
     addError(chatMessagesEl, err.message, () => sendChatMessage(text, msg));
   } finally {
     if (mySession === sessionId) {
-      input.disabled = false;
-      button.disabled = false;
-      input.focus();
+      sendInFlight = false;
+      syncSendButton();
+      $("chatInput").focus();
       scrollToBottom(chatMessagesEl);
     }
   }
@@ -610,6 +615,7 @@ function resetSessionState() {
   tutorTurns = [];
   opening = null;
   openingInFlight = false;
+  sendInFlight = false;
   chatHistory = [];
   tutorHistory = [];
   transcript = [];
@@ -618,6 +624,7 @@ function resetSessionState() {
   chatMessagesEl.innerHTML = "";
   tutorMessagesEl.innerHTML = "";
   addTutorIntro();
+  syncSendButton(); // no opening yet → Send disabled, but the input stays typeable
 }
 
 // Start a session from a known scenario (typed situation or demo).
@@ -637,7 +644,6 @@ function startSession(scenario) {
 // Each new conversation generates a fresh scenario via the AI (cheap call on the
 // configured model), then opens in character. Replaces the old pre-generated
 // public/scenarios.json deck.
-let scenarioInFlight = false;
 async function startRandomSession() {
   if (scenarioInFlight) return;
   if (!hasKeyForModel(model)) {
@@ -650,13 +656,10 @@ async function startRandomSession() {
   situationDisplay = "Generating a situation…";
   showMain();
 
-  const input = $("chatInput");
-  const button = $("chatForm").querySelector("button");
-  input.disabled = true;
-  button.disabled = true;
   const thinking = addThinking(chatMessagesEl);
   scrollToBottom(chatMessagesEl);
   scenarioInFlight = true;
+  syncSendButton(); // Send stays disabled until the opening is ready
   const mySession = sessionId; // bail if a newer session supersedes us mid-flight
   try {
     const sc = await apiScenario({ model, level });
@@ -667,19 +670,18 @@ async function startRandomSession() {
     situationDisplay = sc.learner;
     voiceGender = sc.voice_gender || null;
     renderSituationLabel();
-    generateOpening(); // manages input enabled-state from here
+    generateOpening(); // takes over the Send-button state from here
   } catch (err) {
     if (mySession !== sessionId) return;
     thinking.remove();
     situationDisplay = "Couldn't generate a situation";
     renderSituationLabel();
-    input.disabled = false;
-    button.disabled = false;
     addError(chatMessagesEl, err.message, startRandomSession);
   } finally {
     // scenarioInFlight is a re-entry lock for this function (only one runs at a
     // time), so always release it — even when superseded.
     scenarioInFlight = false;
+    syncSendButton();
   }
 }
 
@@ -1221,6 +1223,9 @@ const resetTutorInputHistory = attachInputHistory($("tutorInput"), () =>
 $("chatForm").addEventListener("submit", (e) => {
   e.preventDefault();
   stopVoiceInput(); // end any in-progress dictation so it can't refill the input
+  // Typing is always allowed; sending is gated. Bail (keeping the draft) if the
+  // conversation isn't ready or a turn is still in flight.
+  if (!opening || $("chatForm").querySelector("button").disabled) return;
   const text = $("chatInput").value.trim();
   if (!text) return;
   $("chatInput").value = "";
@@ -1459,6 +1464,7 @@ function restoreSession() {
   updateTicker();
 
   restoring = false;
+  syncSendButton(); // restored conversation is ready → Send enabled
   showMain();
   return true;
 }
