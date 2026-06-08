@@ -124,7 +124,8 @@ function renderDiff(original, corrected, strict = false) {
     } else if (op.type === "soft") {
       el = document.createElement("span");
       el.className = "soft-fix";
-      el.title = `You wrote: ${op.orig}`;
+      const wrote = op.orig;
+      attachTooltip(el, () => `You wrote: ${wrote}`, { delay: 350 });
       el.textContent = op.corr;
     } else if (op.type === "del") {
       el = document.createElement("del");
@@ -270,10 +271,10 @@ async function playTts(text, slow, btn, auto = false) {
       btn.textContent = "🔊";
     } else {
       btn.textContent = "⚠";
-      btn.title = err.message;
+      btn._tip = err.message; // surfaced by the custom tooltip on hover
       setTimeout(() => {
         btn.textContent = "🔊";
-        btn.title = SPEAK_TITLE;
+        btn._tip = null;
       }, 2500);
     }
   } finally {
@@ -284,7 +285,7 @@ async function playTts(text, slow, btn, auto = false) {
 function addSpeakButton(parent, getText) {
   const btn = addEl(parent, "button", "speak-btn", "🔊");
   btn.type = "button";
-  btn.title = SPEAK_TITLE;
+  attachTooltip(btn, () => btn._tip || SPEAK_TITLE, { delay: 350 });
   btn.addEventListener("click", (e) => playTts(getText(), e.altKey, btn));
   return btn;
 }
@@ -410,7 +411,7 @@ function applyCostVisibility() {
 function updateTicker() {
   const ticker = $("costTicker");
   ticker.textContent = `$${sessionCost.toFixed(sessionCost < 0.1 ? 3 : 2)}`;
-  ticker.title = `Session cost so far\n${sessionTokens.in.toLocaleString()} tokens in, ${sessionTokens.out.toLocaleString()} out`;
+  ticker._tip = `Session cost so far\n${sessionTokens.in.toLocaleString()} tokens in, ${sessionTokens.out.toLocaleString()} out`;
   applyCostVisibility();
 }
 
@@ -791,6 +792,7 @@ attachTooltip($("situationLabel"), () => (situationDisplay ? `Situation: ${situa
 attachTooltip($("randomizeBtn"), () => "New random situation · ⌘K", { delay: 350 });
 attachTooltip($("editBtn"), () => "Type your own situation", { delay: 350 });
 attachTooltip($("settingsBtn"), () => "Settings", { delay: 350 });
+attachTooltip($("costTicker"), () => $("costTicker")._tip || "Session cost so far", { delay: 350 });
 
 // ---- Keyboard shortcuts ----
 // Defaults below. Rebind without code changes by setting localStorage key
@@ -1118,6 +1120,7 @@ function setupVoiceInput() {
     document.body.classList.add("no-stt");
     return;
   }
+  attachTooltip(micBtn, () => micBtn._tip || MIC_TITLE, { delay: 350 });
   let recognition = null;
   let recognizing = false;
 
@@ -1126,7 +1129,7 @@ function setupVoiceInput() {
     micBtn.classList.remove("recording");
     micBtn.textContent = "🎤";
     micBtn.setAttribute("aria-pressed", "false");
-    micBtn.title = MIC_TITLE;
+    micBtn._tip = null; // back to the default MIC_TITLE
   }
 
   function start() {
@@ -1145,7 +1148,7 @@ function setupVoiceInput() {
       micBtn.classList.add("recording");
       micBtn.textContent = "⏹";
       micBtn.setAttribute("aria-pressed", "true");
-      micBtn.title = "Stop listening";
+      micBtn._tip = "Stop listening";
     };
     recognition.onresult = (e) => {
       let transcript = "";
@@ -1156,8 +1159,8 @@ function setupVoiceInput() {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") blocked = true;
     };
     recognition.onend = () => {
-      reset(); // resets the title; re-apply the blocked hint after, if needed
-      if (blocked) micBtn.title = "Microphone blocked — allow mic access to dictate";
+      reset(); // resets the tooltip; re-apply the blocked hint after, if needed
+      if (blocked) micBtn._tip = "Microphone blocked — allow mic access to dictate";
       $("chatInput").focus();
     };
     try {

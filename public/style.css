@@ -157,6 +157,7 @@ header {
   box-shadow: var(--shadow-lift);
   pointer-events: none;
   overflow-wrap: anywhere;
+  white-space: pre-line; /* honor \n (e.g. the cost ticker's second line) */
   animation: onb-fade 0.1s ease-out;
 }
 
