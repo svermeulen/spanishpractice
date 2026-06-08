@@ -81,6 +81,9 @@ convenience — there are no packages to install).
   scenario generation, settings, and onboarding. No framework, no bundler.
 - Deployed to GitHub Pages from `public/` via GitHub Actions on every push to
   `main` (see `.github/workflows/deploy.yml`).
+- Installable as a PWA (`manifest.json`) — add it to your phone's home screen
+  and it launches like an app. (No service worker / offline mode: conversations
+  need the network to reach the AI.)
 
 See `CLAUDE.md` for a fuller architecture tour.
 

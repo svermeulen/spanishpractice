@@ -12,6 +12,8 @@ No build step and no dependencies needed to run the app — `npm start` just ser
 
 Deploy: pushing to `main` publishes `public/` to GitHub Pages via `.github/workflows/deploy.yml` (enable Pages once: Settings → Pages → Source: GitHub Actions). Served at the custom domain **spanishpractice.app** (the Pages `cname`, also asserted by `public/CNAME`); DNS is managed in Cloudflare (CNAME-flattened apex → `svermeulen.github.io`). The fallback Pages URL is `svermeulen.github.io/spanishpractice/`.
 
+Installable PWA: `public/manifest.json` (linked from `index.html`) makes the site installable to the home screen / app launcher and launches it standalone (no browser chrome). Icons are `icon-192.png` / `icon-512.png` (`purpose: any`) and `icon-maskable-512.png` (`purpose: maskable`, extra safe-zone padding), all rasterized from a full-bleed blue `#2563eb` + white ñ design (matching `apple-touch-icon.png`); manifest paths are relative so they resolve at both the apex domain and the github.io subpath. iOS standalone is handled by the `apple-mobile-web-app-*` meta tags. **There is intentionally no service worker** — installability doesn't require one, and offline caching wouldn't help here since every turn is a live browser→provider call (the AI needs the network regardless). To regenerate the icons: `rsvg-convert -w N -h N -o public/icon-N.png <source.svg>`.
+
 The app has **no dependencies and no build** — it's just static files in `public/`, servable by anything (`npm start` is a thin wrapper around `python3 -m http.server`; no `npm install` is ever needed). Scenarios are generated on the fly by the AI, so there's no Node tooling and no `scripts/` directory.
 
 ## Architecture
