@@ -1206,6 +1206,7 @@ const settingsTabs = document.querySelectorAll(".settings-tab");
 function showSettingsTab(name) {
   settingsTabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
   $("tab-general").classList.toggle("hidden", name !== "general");
+  $("tab-personalization").classList.toggle("hidden", name !== "personalization");
   $("tab-model").classList.toggle("hidden", name !== "model");
   $("tab-audio").classList.toggle("hidden", name !== "audio");
   syncSettingsInputs();

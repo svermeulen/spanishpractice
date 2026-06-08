@@ -183,7 +183,10 @@ header {
   z-index: 100;
   background: rgba(0, 0, 0, 0.55);
   display: flex;
-  align-items: center;
+  /* Top-anchored (not center): switching tabs changes the card's height, and a
+     vertically-centered card would jump as it re-centers. Anchoring the top edge
+     keeps it still — height changes only grow/shrink the bottom. */
+  align-items: flex-start;
   justify-content: center;
   padding: 20px;
   animation: onb-fade 0.18s ease-out;
@@ -192,7 +195,8 @@ header {
   position: relative;
   width: 100%;
   max-width: 420px;
-  max-height: calc(100vh - 40px);
+  margin-top: min(7vh, 52px);
+  max-height: calc(100vh - 40px - min(7vh, 52px));
   overflow-y: auto;
   background: var(--pane-bg);
   border: 1px solid var(--border);

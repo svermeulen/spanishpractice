@@ -60,6 +60,7 @@
 
               <div class="settings-tabs" role="tablist">
                 <button class="settings-tab" type="button" data-tab="general" role="tab" aria-selected="true">General</button>
+                <button class="settings-tab" type="button" data-tab="personalization" role="tab" aria-selected="false">Personalization</button>
                 <button class="settings-tab" type="button" data-tab="model" role="tab" aria-selected="false">AI Model</button>
                 <button class="settings-tab" type="button" data-tab="audio" role="tab" aria-selected="false">Audio</button>
               </div>
@@ -68,10 +69,6 @@
                 <label class="setting setting-row">
                   <span>Level</span>
                   <select id="levelSelect"></select>
-                </label>
-                <label class="setting setting-row">
-                  <span>Spanish variety</span>
-                  <select id="regionSelect"></select>
                 </label>
 
                 <h3 class="settings-section">Appearance</h3>
@@ -99,8 +96,13 @@
                 <label class="setting setting-row">
                   <span><input type="checkbox" id="showCost" /> Show session cost</span>
                 </label>
+              </div>
 
-                <h3 class="settings-section">Personalization</h3>
+              <div class="settings-panel hidden" id="tab-personalization" role="tabpanel">
+                <label class="setting setting-row">
+                  <span>Spanish variety</span>
+                  <select id="regionSelect"></select>
+                </label>
                 <label class="setting setting-col">
                   <span>Scenario context <span class="setting-hint">(optional)</span></span>
                   <textarea id="scenarioContext" class="setting-input" rows="2" autocomplete="off" spellcheck="false" placeholder="e.g. I'm a nurse living in Valencia — lean toward work and daily-life situations"></textarea>

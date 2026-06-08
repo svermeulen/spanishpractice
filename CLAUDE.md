@@ -47,14 +47,16 @@ Defined in the `KEYMAP` object in `public/app.js`; rebindable without code chang
 
 ## Settings modal
 
-The ⚙ button in the header opens a centered **modal** (`#settingsPopup` = `.settings-overlay` backdrop → `.settings-card`; the same overlay/card pattern as onboarding) with all per-user settings (persisted in localStorage, applied immediately), split into **three tabs** (`.settings-tabs` / `.settings-panel`; `showSettingsTab()` toggles `#tab-general` / `#tab-model` / `#tab-audio` and re-syncs the key inputs):
+The ⚙ button in the header opens a **modal** (`#settingsPopup` = `.settings-overlay` backdrop → `.settings-card`; the same overlay/card pattern as onboarding) with all per-user settings (persisted in localStorage, applied immediately), split into **four tabs** (`.settings-tabs` / `.settings-panel`; `showSettingsTab()` toggles `#tab-general` / `#tab-personalization` / `#tab-model` / `#tab-audio` and re-syncs the key inputs). The card is **top-anchored** (`.settings-overlay` uses `align-items: flex-start` + a `margin-top` on the card, not vertical centering) so it doesn't jump when switching tabs changes the panel's height:
 
 **General tab:**
 - **Level** select (`level`, CEFR A1–B2 from `getLevelOptions()`, default `A1`, applied to subsequent turns).
-- **Spanish variety** select (`region`, from `getRegionOptions()`, default `spain`, applied to subsequent turns + the next scenario).
 - **"Appearance" section:** **Theme** (`theme` — `classic` / `terracotta` / `indigo` / `sage`, default `classic`) and **Mode** (`appearance` — `system` / `light` / `dark`, default `system`). See **Theming** below.
 - **"Conversation" section:** auto-show translations (`autoShowEn`), auto-show notes (`autoShowNotes`), mark accents & punctuation as errors (`checkAccents`, default off), show session cost (`showCost`, default on).
-- **"Personalization" section:** two optional textareas — **Scenario context** (`scenarioContext`, biases generated situations) and **Custom instructions** (`customInstructions`, tweaks the partner's tone/behaviour). Bound via `bindTextSetting(id, key, setter)`, persisted trimmed (empty → key removed). See the **Personalization** note under Architecture.
+
+**Personalization tab** (`#tab-personalization`):
+- **Spanish variety** select (`region`, from `getRegionOptions()`, default `spain`, applied to subsequent turns + the next scenario).
+- Two optional textareas — **Scenario context** (`scenarioContext`, biases generated situations) and **Custom instructions** (`customInstructions`, tweaks the partner's tone/behaviour). Bound via `bindTextSetting(id, key, setter)`, persisted trimmed (empty → key removed). See the **Personalization** note under Architecture.
 
 **AI Model tab** (label "AI Model"; id still `#tab-model`): the model select (grouped by provider, `getModelOptions()`) plus **every** provider key block (`#set-anthropic` / `#set-openai` / `#set-gemini`, and the `#set-compatible` custom-endpoint `<details>`). `applyProviderVisibility()` marks the non-selected ones `.setting-inactive` (dimmed) and sets their inputs `disabled`, and opens `#set-compatible` when it's active — nothing pops in/out on model change. Opening the modal jumps straight to this tab when the current model still needs its key (`toggleSettings` → `showSettingsTab`).
 
