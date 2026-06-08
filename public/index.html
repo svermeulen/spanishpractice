@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spanish Converser</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="no-tts">
+  <!-- Main app -->
+  <div id="main" class="main">
+    <header>
+      <div class="situation-wrap">
+        <button id="randomizeBtn" class="icon-btn" title="New random situation (⌘K)">↻</button>
+        <button id="editBtn" class="icon-btn" title="Type your own situation">✎</button>
+        <div id="situationLabel" class="situation-label"></div>
+        <input id="situationInput" class="situation-input hidden" type="text" placeholder="Describe a situation, then press Enter..." autocomplete="off" />
+      </div>
+      <div class="header-controls">
+        <span id="costTicker" class="cost-ticker" title="Session cost so far">$0.00</span>
+        <div class="settings-wrap">
+          <button id="settingsBtn" class="icon-btn" title="Settings" aria-haspopup="true" aria-expanded="false">⚙</button>
+          <div id="settingsPopup" class="settings-popup hidden">
+            <h3 class="settings-title">Settings</h3>
+            <label class="setting setting-col">
+              <span>Anthropic API key</span>
+              <input type="password" id="anthropicKey" class="setting-input" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+            </label>
+            <label class="setting setting-col">
+              <span>ElevenLabs API key <span class="setting-hint">(optional — enables 🔊)</span></span>
+              <input type="password" id="elevenLabsKey" class="setting-input" placeholder="ElevenLabs key..." autocomplete="off" spellcheck="false" />
+            </label>
+            <p class="settings-note">Your keys are stored only in this browser and sent directly to Anthropic / ElevenLabs — never to any server. Tip: use a key with a spending limit.</p>
+            <label class="setting setting-row">
+              <span>Model</span>
+              <select id="modelSelect">
+                <option value="claude-opus-4-8">Opus 4.8</option>
+                <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+                <option value="claude-haiku-4-5">Haiku 4.5</option>
+              </select>
+            </label>
+            <label class="setting setting-row">
+              <span><input type="checkbox" id="autoShowEn" /> Auto-show translations</span>
+              <kbd class="setting-key">⌘E</kbd>
+            </label>
+            <label class="setting setting-row">
+              <span><input type="checkbox" id="autoShowNotes" /> Auto-show notes</span>
+              <kbd class="setting-key">⌘I</kbd>
+            </label>
+            <label class="setting setting-row">
+              <span><input type="checkbox" id="showCost" /> Show session cost</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </header>
+    <div class="panes">
+      <section class="pane chat-pane">
+        <div id="chatMessages" class="messages"></div>
+        <form id="chatForm" class="input-row">
+          <input id="chatInput" type="text" placeholder="Escribe en espanol..." autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </section>
+      <section class="pane tutor-pane">
+        <div id="tutorMessages" class="messages"></div>
+        <form id="tutorForm" class="input-row">
+          <input id="tutorInput" type="text" placeholder="Why was my last message wrong?" autocomplete="off" />
+          <button type="submit">Ask</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

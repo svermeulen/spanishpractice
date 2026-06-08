@@ -1,0 +1,14 @@
+{
+  "name": "spanish-converser",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Client-only Spanish practice web app: roleplay chat with diff-rendered corrections and a tutor side panel. Bring your own Anthropic / ElevenLabs API keys.",
+  "scripts": {
+    "start": "python3 -m http.server 3000 --directory public",
+    "generate-scenarios": "node scripts/generate-scenarios.mjs"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.102.0"
+  }
+}
