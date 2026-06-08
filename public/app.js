@@ -16,6 +16,7 @@ let turns = []; // [{message, turn}] — in-memory conversation state (not persi
 let tutorTurns = []; // [{question, answer}]
 let opening = null; // {reply_es, reply_en} — the AI's in-character first message
 let openingInFlight = false; // true while the opening request is running
+let restoring = false; // true while rebuilding a saved session (suppresses autoplay)
 let chatHistory = []; // [{role, content}] — assistant entries are reply_es only
 let tutorHistory = [];
 let transcript = []; // ["Learner: ...", "Teacher: ..."] for tutor context
@@ -365,8 +366,10 @@ function addTeacherMessage(turn) {
   if (!autoShowEn) body.classList.add("hidden");
   toggle.addEventListener("click", () => revealBody(body, body.classList.toggle("hidden")));
   scrollToBottom(chatMessagesEl);
-  // Auto-play the reply (listening practice) when enabled and audio is available.
-  if (autoPlayAudio && ttsAvailable() && !isDemo) {
+  // Auto-play the reply (listening practice) when enabled and audio is
+  // available — but not while rebuilding a restored session (would replay every
+  // past line at once).
+  if (autoPlayAudio && ttsAvailable() && !isDemo && !restoring) {
     playTts(turn.reply_es, false, speakBtn, true);
   }
 }
@@ -446,6 +449,7 @@ async function generateOpening() {
     opening = { reply_es: turn.reply_es, reply_en: turn.reply_en };
     addTeacherMessage(opening);
     seedOpeningHistory();
+    saveSession();
   } catch (err) {
     if (mySession !== sessionId) return;
     thinking.remove();
@@ -493,6 +497,7 @@ async function sendChatMessage(text, existingMsg = null) {
     transcript.push(`(corrected: ${turn.corrected_message})`);
     transcript.push(`Teacher: ${turn.reply_es}`);
     turns.push({ message: text, turn });
+    saveSession();
   } catch (err) {
     if (mySession !== sessionId) return;
     thinking.remove();
@@ -537,6 +542,7 @@ async function sendTutorQuestion(text, existingMsg = null) {
     tutorHistory.push({ role: "user", content: text });
     tutorHistory.push({ role: "assistant", content: answer });
     tutorTurns.push({ question: text, answer });
+    saveSession();
   } catch (err) {
     if (mySession !== sessionId) return;
     thinking.remove();
@@ -607,6 +613,7 @@ function resetSessionState() {
 // Start a session from a known scenario (typed situation or demo).
 function startSession(scenario) {
   resetSessionState();
+  if (!isDemo) clearSavedSession(); // a new conversation discards the saved one
   const sc = normalizeScenario(scenario);
   situation = sc.ai;
   situationDisplay = sc.learner;
@@ -628,6 +635,7 @@ async function startRandomSession() {
     return;
   }
   resetSessionState();
+  clearSavedSession(); // a new conversation discards the saved one
   situation = "";
   situationDisplay = "Generating a situation…";
   showMain();
@@ -1190,13 +1198,101 @@ $("onbClose").addEventListener("click", () => {
   toggleSettings(true);
 });
 
+// ---- Session persistence ----
+// The single in-progress conversation is mirrored to localStorage so a reload
+// resumes it. Only the active conversation is kept — starting a new scenario
+// (🎲 / typed / onboarding) clears it, so there's no history of past chats.
+// Saved on every completed turn; the rendered DOM is rebuilt from the snapshot
+// on boot. Audio clips aren't stored (regenerated on demand).
+const SESSION_KEY = "activeSession";
+
+function saveSession() {
+  if (!situation || !opening) return; // nothing meaningful to restore yet
+  try {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        v: 1,
+        sessionId,
+        situation,
+        situationDisplay,
+        voiceGender,
+        opening,
+        turns,
+        tutorTurns,
+        cost: sessionCost,
+        tokensIn: sessionTokens.in,
+        tokensOut: sessionTokens.out,
+      })
+    );
+  } catch {
+    // Quota or serialization failure — persistence is best-effort, so ignore.
+  }
+}
+
+function clearSavedSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+// Rebuild a saved conversation into a live session. Returns false (and leaves
+// state untouched) when there's nothing valid to restore.
+function restoreSession() {
+  let snap;
+  try {
+    snap = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+  } catch {
+    snap = null;
+  }
+  if (!snap || snap.v !== 1 || !snap.opening || !snap.situation) return false;
+
+  resetSessionState(); // clears panes/state, adds the tutor intro
+  restoring = true; // suppress per-message autoplay while replaying history
+  if (snap.sessionId) sessionId = snap.sessionId; // keep the same TTS voice
+  situation = snap.situation;
+  situationDisplay = snap.situationDisplay || "";
+  voiceGender = snap.voiceGender || null;
+  opening = snap.opening;
+
+  addTeacherMessage(opening);
+  seedOpeningHistory();
+  for (const { message, turn } of snap.turns || []) {
+    if (!Array.isArray(turn.mistake_tags)) turn.mistake_tags = []; // defensive
+    const msg = addUserChatMessage(message);
+    addCorrectionBlock(msg, message, turn);
+    addTeacherMessage(turn);
+    chatHistory.push({ role: "user", content: message });
+    chatHistory.push({ role: "assistant", content: turn.reply_es });
+    transcript.push(`Learner: ${message}`);
+    transcript.push(`(corrected: ${turn.corrected_message})`);
+    transcript.push(`Teacher: ${turn.reply_es}`);
+    turns.push({ message, turn });
+  }
+  for (const { question, answer } of snap.tutorTurns || []) {
+    const q = addEl(tutorMessagesEl, "div", "msg user");
+    addEl(q, "div", "bubble", question);
+    const reply = addEl(tutorMessagesEl, "div", "msg teacher");
+    addEl(reply, "div", "bubble", answer);
+    tutorHistory.push({ role: "user", content: question });
+    tutorHistory.push({ role: "assistant", content: answer });
+    tutorTurns.push({ question, answer });
+  }
+  sessionCost = snap.cost || 0;
+  sessionTokens = { in: snap.tokensIn || 0, out: snap.tokensOut || 0 };
+  updateTicker();
+
+  restoring = false;
+  showMain();
+  return true;
+}
+
 // ---- Boot ----
-// No start screen: configured users jump straight into a generated scenario;
-// first-run (no usable model+key) gets the onboarding modal, which kicks off
-// the first scenario once a provider + key are supplied.
+// No start screen: configured users resume a saved conversation if one exists,
+// otherwise jump straight into a generated scenario; first-run (no usable
+// model+key) gets the onboarding modal, which kicks off the first scenario once
+// a provider + key are supplied.
 if (!isDemo) {
-  if (hasKeyForModel(model)) startRandomSession();
-  else showOnboarding();
+  if (!hasKeyForModel(model)) showOnboarding();
+  else if (!restoreSession()) startRandomSession();
 }
 
 // Dev helper: ?demo renders a sample conversation without calling the API,
