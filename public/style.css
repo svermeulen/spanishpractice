@@ -122,30 +122,22 @@ button { font-family: inherit; }
    frost's blur radius is the Background-blur slider (--scene-blur): 0 = clear
    glass (sharp photo), higher = more blur. */
 body.has-scene { background: transparent; }
-/* The header stays opaque (it reads badly over busy photos); only the panes
-   frost. */
-body.has-scene .pane {
+/* Only the chat (conversation) pane frosts over the photo — the header and the
+   tutor pane stay opaque, so the scene sits behind the conversation alone. */
+body.has-scene .chat-pane {
   background: color-mix(in srgb, var(--pane-bg) 46%, transparent);
   -webkit-backdrop-filter: blur(var(--scene-blur, 6px)) saturate(1.2);
   backdrop-filter: blur(var(--scene-blur, 6px)) saturate(1.2);
 }
-body.has-scene .tutor-pane {
-  background: color-mix(in srgb, var(--pane-alt) 46%, transparent);
-}
-/* Over a scene photo, give floating text its own backing so it stays readable.
-   (Message bubbles and the correction box already have solid backgrounds; these
-   are the bits that otherwise sit straight on the translucent pane.) */
+/* In the frosted chat pane the teacher reply's translation sits straight on the
+   glass; give it its own backing so it stays readable. (Message bubbles and the
+   correction box already have solid backgrounds.) */
 body.has-scene .reply-meta {
   width: fit-content;
   max-width: 100%;
   background: color-mix(in srgb, var(--pane-bg) 88%, transparent);
   padding: 5px 11px;
   border-radius: 12px;
-}
-body.has-scene .tutor-title {
-  background: color-mix(in srgb, var(--pane-bg) 88%, transparent);
-  padding: 3px 9px;
-  border-radius: 7px;
 }
 
 /* ---- Main layout ---- */
